@@ -1,0 +1,222 @@
+/* ── Pasig Theme: GenerateQR ── */
+
+/* ── Header ── */
+.generate-header {
+  --background: #0d2f6e;
+  --border-width: 0;
+  position: relative;
+}
+
+.gen-back-button {
+  position: absolute;
+  left: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #ffffff;
+  font-size: 1.5rem;
+  z-index: 10;
+  cursor: pointer;
+}
+
+.generate-title {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  font-weight: 700;
+  font-size: 1.4rem;
+  letter-spacing: 1px;
+  color: #ffffff;
+}
+
+/* ── Page Background ── */
+.generate-content {
+  --background: #f0f6fd;
+}
+
+.generate-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 1.5rem 1.5rem 3rem 1.5rem;
+  gap: 1.2rem;
+}
+
+/* ── Instruction text ── */
+.gen-instruction {
+  text-align: center;
+  background: #ffffff;
+  border-radius: 1rem;
+  padding: 1rem 1.5rem;
+  border: 1.5px solid #dde8f5;
+  width: 100%;
+  max-width: 320px;
+}
+
+.gen-instruction p {
+  margin: 0.2rem 0;
+  color: #5a6a7a;
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
+
+
+
+/* ── QR Card ── */
+.qr-card {
+  background: white;
+  border-radius: 2rem;
+  padding: 1.5rem;
+  border: 1.5px solid #dde8f5;
+  width: 100%;
+  max-width: 320px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  transition: opacity 0.3s;
+}
+
+.qr-card.expired {
+  opacity: 0.55;
+}
+
+.qr-card-inner {
+  width: 260px;
+  height: 260px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 1rem;
+  overflow: hidden;
+  background: #f6faff;
+  border: 1px solid #dde8f5;
+}
+
+.qr-image {
+  width: 260px;
+  height: 260px;
+  border-radius: 0.5rem;
+  animation: fadeIn 0.4s ease;
+}
+
+/* Loading state */
+.qr-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  color: #1a8fe3;
+  font-size: 0.95rem;
+}
+
+/* Expired overlay */
+.qr-expired-overlay {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  color: #d32f2f;
+  text-align: center;
+}
+
+.qr-expired-overlay ion-icon {
+  font-size: 3.5rem;
+}
+
+.qr-expired-overlay p {
+  font-size: 1.2rem;
+  font-weight: 700;
+  margin: 0;
+}
+
+.qr-expired-overlay span {
+  font-size: 0.85rem;
+  color: #5a6a7a;
+}
+
+/* ── Timer ── */
+.qr-timer {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.9rem;
+  color: #2e7d32;
+  font-weight: 600;
+  background: rgba(46, 125, 50, 0.09);
+  padding: 0.4rem 1rem;
+  border-radius: 2rem;
+}
+
+.qr-timer.warning {
+  color: #e65100;
+  background: rgba(230, 81, 0, 0.09);
+  animation: pulse 1s ease-in-out infinite;
+}
+
+.qr-timer.expired-timer {
+  color: #d32f2f;
+  background: rgba(211, 47, 47, 0.09);
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+/* ── Session Badge ── */
+.session-badge {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: linear-gradient(135deg, #0d2f6e 0%, #1a8fe3 100%);
+  color: white;
+  padding: 0.5rem 1.2rem;
+  border-radius: 2rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+}
+
+.session-badge ion-icon {
+  font-size: 1rem;
+}
+
+/* ── Buttons ── */
+.view-list-btn {
+  width: 100%;
+  max-width: 320px;
+  --border-radius: 3rem;
+  --padding-top: 1.2rem;
+  --padding-bottom: 1.2rem;
+  font-weight: 700;
+  font-size: 1.05rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin: 0;
+}
+
+/* ── Animations ── */
+@keyframes fadeIn {
+  from { opacity: 0; transform: scale(0.95); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+/* ── Responsive ── */
+@media (max-width: 768px) {
+  .generate-title {
+    font-size: 1.15rem;
+  }
+
+  .qr-card-inner,
+  .qr-image {
+    width: 220px;
+    height: 220px;
+  }
+
+  .view-list-btn {
+    font-size: 0.95rem;
+    --padding-top: 1rem;
+    --padding-bottom: 1rem;
+  }
+}

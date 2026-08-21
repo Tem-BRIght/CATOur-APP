@@ -1,0 +1,47 @@
+/* Page background */
+ion-content {
+  --background: #f9fafb;
+}
+
+/* Search bar spacing */
+.help-search {
+  padding: 12px 16px 0;
+}
+
+/* Section cards */
+ion-list[inset] {
+  margin-top: 16px;
+  border-radius: 16px;
+}
+
+/* Section headers */
+ion-item strong {
+  font-size: 14px;
+  color: #374151;
+}
+
+/* Icons */
+ion-item ion-icon {
+  color: var(--ion-color-primary);
+  font-size: 18px;
+}
+
+/* Action buttons */
+.help-actions {
+  padding: 16px;
+}
+
+.help-actions ion-button:first-child {
+  margin-bottom: 8px;
+}
+
+.category-answer {
+  --background: #f3f4f6;
+  --padding-start: 56px;
+}
+
+.category-answer p {
+  color: #4b5563;
+  line-height: 1.5;
+  white-space: normal;
+}

@@ -1,0 +1,116 @@
+/* Page background */
+ion-content {
+  --background: #f9fafb;
+}
+
+/* Header */
+.terms-header {
+  text-align: center;
+  padding: 28px 20px 20px;
+  background: #fff;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.terms-header h2 {
+  font-size: 20px;
+  font-weight: 700;
+  color: #111827;
+  margin: 0 0 4px;
+}
+
+.terms-header p {
+  font-size: 12px;
+  color: #9ca3af;
+  margin: 0;
+}
+
+/* Tab bar */
+.terms-tabs {
+  display: flex;
+  background: #fff;
+  border-bottom: 1px solid #e5e7eb;
+  padding: 0 16px;
+  gap: 8px;
+}
+
+.terms-tab {
+  flex: 1;
+  padding: 12px 8px;
+  background: none;
+  border: none;
+  border-bottom: 2.5px solid transparent;
+  font-size: 14px;
+  font-weight: 600;
+  color: #6b7280;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.terms-tab--active {
+  color: var(--ion-color-primary);
+  border-bottom-color: var(--ion-color-primary);
+}
+
+/* Sections */
+.terms-body {
+  padding: 16px;
+}
+
+.terms-section {
+  background: #fff;
+  border-radius: 14px;
+  padding: 18px 16px;
+  margin-bottom: 14px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+}
+
+.terms-section h3 {
+  font-size: 14px;
+  font-weight: 700;
+  color: #111827;
+  margin: 0 0 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.terms-section h3 ion-icon {
+  color: var(--ion-color-primary);
+  font-size: 18px;
+}
+
+.terms-section p {
+  font-size: 13px;
+  line-height: 1.65;
+  color: #4b5563;
+  margin: 0 0 8px;
+}
+
+.terms-section p:last-child {
+  margin: 0;
+}
+
+.terms-section ul {
+  margin: 6px 0 0;
+  padding-left: 18px;
+}
+
+.terms-section ul li {
+  font-size: 13px;
+  color: #4b5563;
+  line-height: 1.65;
+  margin-bottom: 4px;
+}
+
+/* Acceptance strip */
+.terms-accept {
+  padding: 8px 16px 32px;
+}
+
+.terms-accept p {
+  font-size: 12px;
+  color: #9ca3af;
+  text-align: center;
+  margin-bottom: 10px;
+  line-height: 1.5;
+}

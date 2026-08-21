@@ -1,0 +1,85 @@
+{
+  "project_info": {
+    "project_number": "53598789861",
+    "firebase_url": "https://seeways-be14b-default-rtdb.firebaseio.com",
+    "project_id": "seeways-be14b",
+    "storage_bucket": "seeways-be14b.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:53598789861:android:70c1a17be2cacfb649b40c",
+        "android_client_info": {
+          "package_name": "PasigTourism.ph"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "53598789861-8lju374bpgsfnf80bsimamq70lhc8j9n.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "PasigTourism.ph",
+            "certificate_hash": "1010101001100110010001101001001000010110"
+          }
+        },
+        {
+          "client_id": "53598789861-55pvrnp8nna2uvbpod6pi11amkrsethh.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAQZ-upvqtBDYQXUAcJ-rA_mzSRYchXC_E"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "53598789861-55pvrnp8nna2uvbpod6pi11amkrsethh.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:53598789861:android:257ab4bc98f8933549b40c",
+        "android_client_info": {
+          "package_name": "io.catour.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "53598789861-nkp73vv2gb5pon2vt4j98jdrqkivlqjj.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "io.catour.app",
+            "certificate_hash": "839ac1c52605645c7cf9ab4b02d55e68f450ff21"
+          }
+        },
+        {
+          "client_id": "53598789861-55pvrnp8nna2uvbpod6pi11amkrsethh.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAQZ-upvqtBDYQXUAcJ-rA_mzSRYchXC_E"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "53598789861-55pvrnp8nna2uvbpod6pi11amkrsethh.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

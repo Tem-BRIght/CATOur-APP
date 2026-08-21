@@ -1,0 +1,117 @@
+/* ── Pasig Theme: Analytics ── */
+.ga-header { --background: #0d2f6e; --border-width: 0; position: relative; }
+.ga-back-btn {
+  position: absolute;
+  left: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #fff;
+  font-size: 1.8rem;
+  z-index: 10;
+  cursor: pointer;
+  line-height: 1;
+}
+.ga-title {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  font-weight: 700;
+  font-size: 1.25rem;
+  letter-spacing: 1px;
+  color: #fff;
+  white-space: nowrap;
+}
+.ga-content { --background: #f0f6fd; }
+
+.ga-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  padding-top: 4rem;
+  color: #1a8fe3;
+  font-size: 0.95rem;
+}
+
+.ga-wrapper {
+  padding: 1.25rem 1rem 2.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.ga-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.85rem;
+}
+@media (max-width: 620px) {
+  .ga-stats-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.ga-stat-card {
+  background: #fff;
+  border-radius: 1rem;
+  padding: 1rem;
+  box-shadow: 0 4px 16px rgba(13, 47, 110, 0.08);
+  border: 1.5px solid #dde8f5;
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+}
+.ga-stat-icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.25rem;
+  color: #fff;
+}
+.ga-stat-icon.sessions { background: linear-gradient(135deg, #0d2f6e 0%, #1a5cb8 100%); }
+.ga-stat-icon.tourists { background: linear-gradient(135deg, #1a8fe3 0%, #0d6bbf 100%); }
+.ga-stat-icon.rating   { background: linear-gradient(135deg, #f4b400 0%, #e0a100 100%); }
+
+.ga-stat-details { display: flex; flex-direction: column; }
+.ga-stat-label { font-size: 0.78rem; color: #5a6a7a; font-weight: 500; }
+.ga-stat-number { font-size: 1.5rem; font-weight: 800; color: #0d2f6e; line-height: 1.25; }
+.ga-stat-sub { font-size: 0.72rem; color: #8fa3bc; }
+
+.ga-card {
+  background: #fff;
+  border-radius: 1.2rem;
+  padding: 1.1rem 1rem;
+  box-shadow: 0 4px 16px rgba(13, 47, 110, 0.08);
+  border: 1.5px solid #dde8f5;
+}
+.ga-card-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.9rem;
+}
+.ga-card-header ion-icon { color: #1a8fe3; font-size: 1.2rem; }
+.ga-card-header h4 { margin: 0; font-size: 1rem; font-weight: 700; color: #0d2f6e; flex: 1; }
+.ga-badge {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #1a5cb8;
+  background: #e8f3fc;
+  border-radius: 20px;
+  padding: 3px 10px;
+}
+.ga-empty { color: #8fa3bc; font-size: 0.9rem; text-align: center; padding: 2rem 0; }
+
+.analytics-linechart { width: 100%; height: auto; }
+.chart-axis { stroke: #dde8f5; stroke-width: 1.5; }
+.chart-area { fill: rgba(26, 143, 227, 0.12); }
+.chart-line { fill: none; stroke: #1a8fe3; stroke-width: 2.5; stroke-linejoin: round; stroke-linecap: round; }
+.chart-dot { fill: #0d2f6e; }
+.chart-x-label { font-size: 10px; fill: #8fa3bc; text-anchor: middle; }
+.chart-point-label { font-size: 10px; fill: #0d2f6e; font-weight: 700; text-anchor: middle; }

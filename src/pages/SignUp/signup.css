@@ -1,0 +1,450 @@
+ion-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  --background: transparent;
+}
+
+.logo-wrap{
+  display:flex;
+  justify-content:center;
+  margin: 3rem auto 8px auto;
+  width: 120px;
+  height: 80px;
+}
+
+.formSubtitle{
+  text-align:center;
+  font-size:22px;
+  font-weight:700;
+  margin: 0 20px 6px;
+  color:#111827;
+}
+
+.logo{
+  width:120px;
+  height:auto;
+  display:block;
+}
+.title{
+  text-align:center;
+  color: #0d2f6e;
+  font-weight:700;
+  font-size: 18px;
+  margin:12px 0 4px;
+}
+.subtitle{
+  text-align:center;
+  color:#4b5563;
+  margin:0 0 16px;
+  font-size: 12px;
+  letter-spacing: 0.2px;
+}
+.login-card{
+  width:100%;
+  flex-direction: column;
+  max-width:460px;
+  margin: 0 auto;
+  padding: 12px;
+  box-sizing: border-box;
+}
+
+/* ── Progress Indicator ───────────────────────────────────────────────── */
+.signup-progress {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 24px;
+  padding: 12px 0 4px;
+}
+
+.progress-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.step-number {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 700;
+  transition: background 0.25s ease, box-shadow 0.25s ease;
+}
+
+.progress-step.completed .step-number {
+  background: #28a745;
+  color: white;
+}
+
+.progress-step.active .step-number {
+  background: #0d2f6e;
+  color: white;
+  box-shadow: 0 0 0 4px rgba(54, 124, 255, 0.18);
+}
+
+.progress-step:not(.completed):not(.active) .step-number {
+  background: #e9ecef;
+  color: #6c757d;
+}
+
+.progress-line {
+  width: 40px;
+  height: 2px;
+  background: #e9ecef;
+  margin: 0 8px;
+  margin-bottom: 20px; /* align with center of the circles, not the labels */
+  transition: background 0.25s ease;
+}
+
+.progress-line.completed,
+.progress-line.active {
+  background: #28a745;
+}
+
+.step-label {
+  font-size: 10px;
+  font-weight: 500;
+  color: #6b7280;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.progress-step.active .step-label {
+  color: #0d2f6e;
+  font-weight: 700;
+}
+
+/* ── Card & Form ──────────────────────────────────────────────────────── */
+.form{
+  display: flex;
+  flex-direction: column;
+  padding: 32px 28px;
+  border-radius: 24px;
+  margin: auto;
+  gap: 14px;
+  background-color: #ffffff;
+  box-shadow: 0 18px 40px rgba(31, 78, 121, 0.12);
+}
+
+.login-link{
+  text-align:center;
+  margin-top:16px;
+}
+
+.link-login{
+  color:#000;
+  text-decoration:none;
+}
+
+.checkbox-row{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  margin-left:2px;
+}
+
+.checkbox-label{
+  font-size:14px;
+  color:#111827;
+}
+
+.next-button{
+  background-color:#0d2f6e;
+  color:#FFFFFF;
+  font-weight:600;
+  border-radius:8px;
+  transition: filter 0.15s ease;
+}
+.next-button:hover{
+  filter: brightness(1.05);
+}
+.next-button a{
+  color:#FFFFFF;
+  text-decoration:none;
+}
+.login-button{
+  --background: #0d2f6e;
+  --background-hover: #2f6fe6;
+  --color: #ffffff;
+  --border-radius: 10px;
+  font-weight: 600;
+  height: 48px;
+  margin-top: 6px;
+  text-transform: none;
+  letter-spacing: 0.2px;
+}
+
+/* ── Photo Upload ─────────────────────────────────────────────────────── */
+.photo-upload {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.photo-upload h3 {
+  margin-bottom: 15px;
+  color: #333;
+  font-weight: 600;
+}
+
+.photo-container {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 108px;
+  width: 108px;
+  margin: 0 auto;
+}
+
+.profile-avatar,
+.userprofile-avatar {
+  width: 100px;
+  height: 100px;
+  margin: 0 auto;
+  border: 3px solid #e0e0e0;
+  transition: border-color 0.25s ease;
+}
+
+.profile-avatar.has-photo,
+.userprofile-avatar.has-photo {
+  border-color: #0d2f6e;
+}
+
+.profile-avatar.no-photo,
+.userprofile-avatar.no-photo {
+  border-color: #dbe2ea;
+  border-style: dashed;
+}
+
+.profile-avatar .placeholder,
+.userprofile-avatar .placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  width: 100%;
+  height: 100%;
+  background: #f8f9fa;
+  color: #6b7280;
+  font-size: 11px;
+  font-weight: 500;
+  gap: 4px;
+}
+
+.profile-avatar .placeholder-icon,
+.userprofile-avatar .placeholder-icon {
+  font-size: 22px;
+  color: #b7bfc9;
+}
+
+/* Camera badge — sits on the avatar's edge, not floating below it */
+.camera-button {
+  position: absolute;
+  bottom: 2px;
+  right: 2px;
+  margin: 0;
+  --padding-start: 0;
+  --padding-end: 0;
+  --padding-top: 0;
+  --padding-bottom: 0;
+  --background: #0d2f6e;
+  --background-hover: #2f6fe6;
+  --color: white;
+  --border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  box-shadow: 0 2px 8px rgba(56, 128, 255, 0.35);
+  transition: transform 0.15s ease;
+}
+
+.camera-button::part(native) {
+  border-radius: 50%;
+}
+
+.camera-button:hover {
+  transform: scale(1.08);
+}
+
+.camera-button ion-icon {
+  font-size: 16px;
+}
+
+.photo-hint {
+  font-size: 12px;
+  color: #6b7280;
+  margin-top: 10px;
+}
+
+.photo-requirements {
+  font-size: 11px;
+  color: #999;
+  margin-top: 5px;
+}
+
+.confirm-button {
+  margin-top: 20px;
+}
+
+/* ── Enhanced Terms ───────────────────────────────────────────────────── */
+.checkbox-wrapper {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.terms-container {
+  display: flex;
+  flex-direction: column;
+  margin: 8px 0 0;
+  padding: 14px 15px;
+  background: #f8f9fa;
+  border-radius: 10px;
+  border: 1px solid #e9ecef;
+}
+
+.terms-checkbox {
+  margin-top: 2px;
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  accent-color: #0d2f6e;
+}
+
+.terms-label {
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: #374151;
+  flex: 1;
+}
+
+.terms-link {
+  color: #0d2f6e;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.terms-link:hover {
+  text-decoration: underline;
+}
+
+.terms-error {
+  color: #dc3545;
+  font-size: 12px;
+  margin-top: 8px;
+  font-weight: 500;
+}
+
+/* ── Form Labels ──────────────────────────────────────────────────────── */
+ion-label {
+  color: #374151 !important;
+  font-weight: 600 !important;
+  font-size: 13px !important;
+  margin-bottom: 6px !important;
+  display: block !important;
+}
+
+ion-item ion-label {
+  --color: #374151 !important;
+  color: #374151 !important;
+}
+
+.signup-3-label {
+  color: #374151 !important;
+  font-weight: 600 !important;
+  font-size: 13px !important;
+  margin-bottom: 6px !important;
+  display: block !important;
+  line-height: 1.4 !important;
+}
+
+.signup-3-label[slot="start"],
+.signup-3-label[slot="end"] {
+  color: #374151 !important;
+  font-weight: 600 !important;
+}
+
+/* ── Form Header ──────────────────────────────────────────────────────── */
+.form-header {
+  text-align: center;
+  margin-bottom: 25px;
+}
+
+.form-header .formSubtitle {
+  font-size: 18px;
+  font-weight: 700;
+  color: #333;
+  margin-bottom: 5px;
+}
+
+.form-description {
+  font-size: 14px;
+  color: #666;
+  margin: 0;
+}
+
+/* ── Form Items ───────────────────────────────────────────────────────── */
+.input-item {
+  --border-radius: 12px;
+  --padding-start: 16px;
+  --inner-padding-end: 16px;
+  --border-color: #e2e5e9;
+  --background: #ffffff;
+  margin-bottom: 2px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  transition: box-shadow 0.15s ease;
+}
+
+.input-item.item-has-focus {
+  --border-color: #0d2f6e;
+  --border-width: 1.5px;
+  box-shadow: 0 2px 10px rgba(54, 124, 255, 0.18);
+}
+
+.other-select-trigger {
+  --background: #f1f1f1;
+  --background-hover: #f1f1f1;
+  --background-activated: #e8e8e8;
+  --border-color: transparent;
+  --border-radius: 12px;
+  --box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  --color: #9aa4b2;
+  --padding-start: 16px;
+  --padding-end: 16px;
+  --padding-top: 0;
+  --padding-bottom: 0;
+  height: 42px;
+  margin: 0 0 2px;
+  font-size: 14px;
+  font-weight: 400;
+  text-transform: none;
+}
+
+.text-input {
+  --placeholder-color: #9aa4b2;
+  --placeholder-opacity: 1;
+  font-size: 14px;
+}
+
+.input-icon {
+  color: #9aa4b2;
+  font-size: 18px;
+}
+
+ion-popover {
+  --backdrop-opacity: 0;
+}
+
+.button-native{
+  border-color: var(#e2e5e9);
+}

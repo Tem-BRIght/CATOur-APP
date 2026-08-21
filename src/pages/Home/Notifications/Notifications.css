@@ -1,0 +1,228 @@
+@import url('https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&display=swap');
+
+/* ─── NOTIFICATIONS PAGE ─────────────────────────────────── */
+
+.notif-header {
+  --background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.notif-toolbar {
+  --background: transparent;
+  --border-color: transparent;
+}
+
+.notif-title {
+  font-family: 'Sora', sans-serif;
+  font-size: 18px;
+  font-weight: 700;
+  color: #0F172A;
+  letter-spacing: -0.01em;
+}
+
+/* ─── CONTENT ────────────────────────────────────────────── */
+.notif-content {
+  --background: #F8FAFC;
+}
+
+/* ─── UNREAD BANNER ──────────────────────────────────────── */
+.notif-unread-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 18px;
+  background: #EFF6FF;
+  border-bottom: 1px solid #DBEAFE;
+}
+
+.notif-unread-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #0d2f6e;
+}
+
+.notif-mark-all {
+  font-size: 12px;
+  font-weight: 500;
+  color: #1a8fe3;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+}
+
+/* ─── SECTION LABEL ──────────────────────────────────────── */
+.notif-section-label {
+  padding: 16px 18px 6px;
+  font-family: 'Sora', sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  color: #94A3B8;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+/* ─── NOTIFICATION ITEM ──────────────────────────────────── */
+.notif-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 14px 18px;
+  background: #fff;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.04);
+  cursor: pointer;
+  transition: background 0.18s ease;
+  position: relative;
+}
+
+.notif-item:last-child {
+  border-bottom: none;
+}
+
+.notif-item:active {
+  background: #F8FAFC;
+}
+
+.notif-item.unread {
+  background: #FAFCFF;
+}
+
+.notif-item.unread::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: #1a8fe3;
+  border-radius: 0 2px 2px 0;
+}
+
+/* ─── ICON WRAP ──────────────────────────────────────────── */
+.notif-icon-wrap {
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-size: 20px;
+}
+
+.notif-icon-wrap.like {
+  background: #FEF2F2;
+  color: #EF4444;
+}
+
+.notif-icon-wrap.rating {
+  background: #FFFBEB;
+  color: #F59E0B;
+}
+
+.notif-icon-wrap.location {
+  background: #EFF6FF;
+  color: #1a8fe3;
+}
+
+.notif-icon-wrap.info {
+  background: #F0FDF4;
+  color: #22C55E;
+}
+
+.notif-icon-wrap.system {
+  background: #F5F3FF;
+  color: #8B5CF6;
+}
+
+/* ─── ITEM BODY ──────────────────────────────────────────── */
+.notif-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.notif-item-title {
+  font-family: 'Sora', sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  color: #0F172A;
+  margin: 0 0 3px;
+}
+
+.notif-item-message {
+  font-size: 13px;
+  color: #64748B;
+  line-height: 1.45;
+  margin: 0 0 5px;
+  white-space: normal;
+}
+
+.notif-item-time {
+  font-size: 11.5px;
+  color: #94A3B8;
+  font-weight: 400;
+}
+
+/* ─── UNREAD DOT ─────────────────────────────────────────── */
+.notif-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #1a8fe3;
+  flex-shrink: 0;
+  margin-top: 6px;
+}
+
+/* ─── ION LIST OVERRIDE ──────────────────────────────────── */
+ion-list.notif-list {
+  padding: 0;
+  background: transparent;
+}
+
+ion-list.notif-list ion-item {
+  --padding-start: 0;
+  --inner-padding-end: 0;
+  --background: transparent;
+  --border-color: transparent;
+}
+
+/* ─── EMPTY STATE ────────────────────────────────────────── */
+.notif-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 80px 32px;
+  gap: 12px;
+}
+
+.notif-empty-icon {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: #EFF6FF;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 32px;
+  color: #93C5FD;
+  margin-bottom: 8px;
+}
+
+.notif-empty h3 {
+  font-family: 'Sora', sans-serif;
+  font-size: 18px;
+  font-weight: 700;
+  color: #0F172A;
+  margin: 0;
+}
+
+.notif-empty p {
+  font-size: 14px;
+  color: #94A3B8;
+  text-align: center;
+  margin: 0;
+  line-height: 1.5;
+}

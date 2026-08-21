@@ -1,0 +1,233 @@
+/* ── Pasig City Color Palette ──
+   Navy:      #0d2f6e
+   Sky Blue:  #1a8fe3
+   Light Blue:#e8f3fc
+   White:     #ffffff
+   Text gray: #5a6a7a
+─────────────────────────── */
+
+/* ── Page Background ── */
+ion-content.home-content {
+  --background: #f0f6fd;
+}
+
+/* ── Hero Banner (also acts as header) ── */
+.home-hero {
+  background: linear-gradient(160deg, #0d2f6e 0%, #1a5cb8 60%, #1a8fe3 100%);
+  padding: 2.5rem 1.5rem 3rem 1.5rem;
+  position: relative;
+  overflow: hidden;
+}
+
+.home-hero::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  right: 0;
+  height: 32px;
+  background: #f0f6fd;
+  border-radius: 2rem 2rem 0 0;
+}
+
+.home-hero::before {
+  content: '';
+  position: absolute;
+  top: -40px;
+  right: -40px;
+  width: 180px;
+  height: 180px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+/* ── Avatar ── */
+.profile-link {
+  text-decoration: none;
+  position: absolute;
+  right: 1.5rem;
+  top: 1.25rem;
+  z-index: 2;
+}
+
+.profile-avatar {
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  min-height: 44px;
+  max-width: 44px;
+  max-height: 44px;
+  border: 2.5px solid #ffffff;
+  border-radius: 50%;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-color: #dde8f5; /* fallback while the image loads */
+}
+
+.welcome-section {
+  margin: 0;
+  position: relative;
+  z-index: 1;
+  padding-top: 0.5rem;
+}
+
+.welcome-section h2 {
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.75);
+  margin-bottom: 0.25rem;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+.welcome-section h1 {
+  font-size: 2rem;
+  font-weight: 800;
+  color: #ffffff;
+  margin: 0;
+  letter-spacing: 1px;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* ── Quick Actions ──
+   Pulled up to slightly overlap the hero's ::after rounded cutout.
+   Because this element has its own solid background + matching border-radius,
+   it physically covers the hairline anti-aliasing seam instead of relying on
+   the ::after color-match alone. */
+.quick-actions {
+  position: relative;
+  z-index: 1;
+  margin-top: -6px;
+  padding: 1.5rem 1rem 0 1rem;
+  background: #f0f6fd;
+  border-radius: 1.5rem 1.5rem 0 0;
+}
+
+.action-card {
+  background: #ffffff;
+  border-radius: 1.25rem;
+  padding: 1.5rem 1rem;
+  text-align: center;
+  box-shadow: 0 4px 20px rgba(13, 47, 110, 0.10);
+  border: 1.5px solid #e8f3fc;
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+  cursor: pointer;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.action-card:active {
+  transform: scale(0.97);
+}
+
+.action-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 28px rgba(13, 47, 110, 0.15);
+}
+
+.action-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 0.85rem;
+}
+
+.action-icon.tourist {
+  background: linear-gradient(135deg, #0d2f6e 0%, #1a5cb8 100%);
+}
+
+.action-icon.history {
+  background: linear-gradient(135deg, #1a8fe3 0%, #0d6bbf 100%);
+}
+
+.action-icon ion-icon {
+  font-size: 1.7rem;
+  color: white;
+}
+
+.action-card h4 {
+  font-size: 0.95rem;
+  font-weight: 700;
+  margin: 0.3rem 0 0.2rem 0;
+  color: #0d2f6e;
+}
+
+.action-card p {
+  font-size: 0.8rem;
+  color: #5a6a7a;
+  margin: 0;
+}
+
+/* ── Footer ── */
+.footer-toolbar {
+  --background: #ffffff;
+  --border-width: 1px 0 0 0;
+  --border-color: #dde8f5;
+  padding: 0;
+}
+
+.qr-scanner-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 0.85rem 0 1.4rem 0;
+}
+
+.qr-scanner-circle {
+  --background: linear-gradient(135deg, #0d2f6e 0%, #1a8fe3 100%);
+  --border-radius: 50%;
+  width: 62px;
+  height: 62px;
+  --padding-start: 0;
+  --padding-end: 0;
+  margin: 0;
+}
+
+.qr-scanner-circle ion-icon {
+  font-size: 1.7rem;
+  color: white;
+}
+
+.qr-scanner-label {
+  margin: 0.5rem 0 0 0;
+  font-size: 0.85rem;
+  color: #0d2f6e;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+}
+
+/* ── Responsive ── */
+@media (max-width: 768px) {
+  .welcome-section h1 {
+    font-size: 1.8rem;
+  }
+
+  .action-card {
+    padding: 1.25rem 0.75rem;
+  }
+
+  .action-icon {
+    width: 52px;
+    height: 52px;
+  }
+
+  .action-icon ion-icon {
+    font-size: 1.5rem;
+  }
+
+  .qr-scanner-circle {
+    width: 60px;
+    height: 60px;
+  }
+
+  .qr-scanner-circle ion-icon {
+    font-size: 1.6rem;
+  }
+}

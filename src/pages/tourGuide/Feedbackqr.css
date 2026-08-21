@@ -1,0 +1,239 @@
+/* ── Pasig Theme: FeedbackQR ── */
+
+/* ── Header ── */
+.fqr-header {
+  --background: #0d2f6e;
+  --border-width: 0;
+  position: relative;
+}
+
+.fqr-back-btn {
+  position: absolute;
+  left: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #ffffff;
+  font-size: 1.5rem;
+  z-index: 10;
+  cursor: pointer;
+}
+
+.fqr-title {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  font-weight: 700;
+  font-size: 1.4rem;
+  letter-spacing: 1px;
+  color: #ffffff;
+}
+
+/* ── Page ── */
+.fqr-content {
+  --background: #f0f6fd;
+}
+
+.fqr-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 1.5rem 1.5rem 3rem 1.5rem;
+  gap: 1.2rem;
+}
+
+/* ── Hero ── */
+.fqr-hero {
+  text-align: center;
+  width: 100%;
+  max-width: 320px;
+}
+
+.fqr-hero h2 {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: #0d2f6e;
+  margin: 0 0 0.5rem 0;
+}
+
+.fqr-hero p {
+  font-size: 0.9rem;
+  color: #5a6a7a;
+  line-height: 1.55;
+  margin: 0;
+}
+
+/* ── QR Card ── */
+.fqr-card {
+  background: #ffffff;
+  border-radius: 2rem;
+  padding: 1.5rem;
+  border: 1.5px solid #dde8f5;
+  box-shadow: 0 8px 32px rgba(13, 47, 110, 0.12);
+  width: 100%;
+  max-width: 320px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  transition: opacity 0.3s;
+}
+
+.fqr-expired {
+  opacity: 0.5;
+}
+
+.fqr-card-inner {
+  width: 260px;
+  height: 260px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 1rem;
+  overflow: hidden;
+  background: #f6faff;
+  border: 1px solid #dde8f5;
+}
+
+.fqr-image {
+  width: 260px;
+  height: 260px;
+  border-radius: 0.5rem;
+  animation: fqrFadeIn 0.4s ease;
+}
+
+/* Loading */
+.fqr-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  color: #1a8fe3;
+  font-size: 0.95rem;
+}
+
+/* Expired overlay */
+.fqr-expired-overlay {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  color: #c0392b;
+  text-align: center;
+}
+
+.fqr-expired-overlay ion-icon {
+  font-size: 3.5rem;
+}
+
+.fqr-expired-overlay p {
+  font-size: 1.2rem;
+  font-weight: 700;
+  margin: 0;
+}
+
+.fqr-expired-overlay span {
+  font-size: 0.85rem;
+  color: #5a6a7a;
+}
+
+/* ── Timer ── */
+.fqr-timer {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.9rem;
+  color: #2e7d32;
+  font-weight: 600;
+  background: rgba(46, 125, 50, 0.09);
+  padding: 0.4rem 1rem;
+  border-radius: 2rem;
+}
+
+.fqr-timer--warning {
+  color: #e65100;
+  background: rgba(230, 81, 0, 0.09);
+  animation: fqrPulse 1s ease-in-out infinite;
+}
+
+.fqr-timer--expired {
+  color: #c0392b;
+  background: rgba(192, 57, 43, 0.09);
+}
+
+@keyframes fqrPulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.5; }
+}
+
+/* ── Steps ── */
+.fqr-steps {
+  width: 100%;
+  max-width: 320px;
+  background: #ffffff;
+  border: 1.5px solid #dde8f5;
+  border-radius: 1rem;
+  padding: 1rem 1.2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.fqr-step {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+}
+
+.fqr-step-num {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #0d2f6e 0%, #1a8fe3 100%);
+  color: #ffffff;
+  font-size: 0.85rem;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.fqr-step span {
+  font-size: 0.88rem;
+  color: #0d2f6e;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+/* ── Home Button ── */
+.fqr-home-btn {
+  width: 100%;
+  max-width: 320px;
+  --background: linear-gradient(135deg, #0d2f6e 0%, #1a8fe3 100%);
+  --border-radius: 3rem;
+  --padding-top: 1.2rem;
+  --padding-bottom: 1.2rem;
+  font-weight: 700;
+  font-size: 1.05rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin: 0;
+}
+
+/* ── Animation ── */
+@keyframes fqrFadeIn {
+  from { opacity: 0; transform: scale(0.95); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+/* ── Responsive ── */
+@media (max-width: 768px) {
+  .fqr-title { font-size: 1.15rem; }
+
+  .fqr-card-inner,
+  .fqr-image {
+    width: 220px;
+    height: 220px;
+  }
+}
