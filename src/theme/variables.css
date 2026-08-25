@@ -1,10 +1,52 @@
 /* For information on how to create your own theme, please refer to:
 http://ionicframework.com/docs/theming/ */
 
-@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700;800&display=swap');
 
-body, ion-app, IonContent, IonPage, ion-page, .ion-page {
-  font-family: 'Montserrat', sans-serif;
+:root {
+  --catour-brand-blue: #1aa7ff;
+  --ion-font-family: 'Sora', 'Segoe UI', sans-serif;
+}
+
+html,
+body,
+ion-app,
+IonContent,
+IonPage,
+ion-page,
+.ion-page,
+* {
+  font-family: 'Sora', 'Segoe UI', sans-serif;
+}
+
+body {
+  color: #0f172a;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+p,
+span,
+div,
+button,
+input,
+textarea,
+select {
+  font-family: inherit;
+}
+
+.title,
+.app-brand,
+.brand-title,
+.logo-title {
+  font-family: 'Sora', 'Segoe UI', sans-serif;
+  color: var(--catour-brand-blue);
+  font-weight: 800;
+  letter-spacing: -0.06em;
 }
 
 .auth-loading-overlay {

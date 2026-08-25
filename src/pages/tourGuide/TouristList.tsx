@@ -174,10 +174,12 @@ const TouristList: React.FC = () => {
   const [isCompletedSession, setIsCompletedSession] = useState(false);
   const [showSummary, setShowSummary] = useState(false);
   const [finalDuration, setFinalDuration] = useState(0);
+  const isEndedSession = session?.status === 'ended';
   const [toastMsg, setToastMsg] = useState('');
   const [tourTypeNames, setTourTypeNames] = useState<string[]>([]);
   const [tourStops, setTourStops] = useState<TourStop[]>([]);
   const [togglingStop, setTogglingStop] = useState<string | null>(null);
+  const [reviewedTouristIds, setReviewedTouristIds] = useState<Set<string>>(new Set());
 
   // ── Timer fix: state for current time, compute elapsed from startTime ──
   const [currentTime, setCurrentTime] = useState(Date.now());
@@ -315,6 +317,24 @@ const TouristList: React.FC = () => {
     loadTourTypes();
     return () => { cancelled = true; };
   }, [session?.guideId]);
+
+  useEffect(() => {
+    if (!session || session.status !== 'ended') {
+      setReviewedTouristIds(new Set());
+      return;
+    }
+
+    let cancelled = false;
+    getDocs(query(collection(firestore, 'feedback'), where('sessionId', '==', session.id)))
+      .then((snapshot) => {
+        if (!cancelled) {
+          setReviewedTouristIds(new Set(snapshot.docs.map((feedbackDoc) => String(feedbackDoc.data()['touristId'] || ''))));
+        }
+      })
+      .catch((error) => console.error('Failed to load feedback status:', error));
+
+    return () => { cancelled = true; };
+  }, [session?.id, session?.status]);
 
   // ── Timer: update currentTime every second only when active ──
   useEffect(() => {
@@ -645,10 +665,14 @@ const TouristList: React.FC = () => {
 
         <IonCard className="tourist-page-card">
           <IonCardContent>
-            <div className="tourist-table-header">
+            <div className={`tourist-table-header ${isEndedSession ? 'tourist-table-header--completed' : ''}`}>
               <div className="header-col-id">#</div>
               <div className="header-col-name">Name</div>
+              <div className="header-col-gender">Gender</div>
+              <div className="header-col-nationality">Nationality</div>
+              <div className="header-col-religion">Religion</div>
               <div className="header-col-email">Email</div>
+              {isEndedSession && <div className="header-col-feedback">Feedback</div>}
             </div>
 
             {loading ? (
@@ -662,7 +686,7 @@ const TouristList: React.FC = () => {
                   filteredTourists.map((tourist, index) => (
                     <IonItem
                       key={`${tourist.uid}-${index}`}
-                      className="tourist-page-row"
+                      className={`tourist-page-row ${isEndedSession ? 'tourist-page-row--completed' : ''}`}
                       lines="full"
                       button
                       onClick={() => handleTouristClick(tourist)}
@@ -677,7 +701,15 @@ const TouristList: React.FC = () => {
                           {currentUser?.uid === tourist.uid && ' (You)'}
                         </span>
                       </div>
+                      <div className="row-col-gender">{tourist.gender || '—'}</div>
+                      <div className="row-col-nationality">{tourist.nationality || '—'}</div>
+                      <div className="row-col-religion">{tourist.religion || '—'}</div>
                       <div className="row-col-email">{tourist.email}</div>
+                      {isEndedSession && (
+                        <div className={`row-col-feedback ${reviewedTouristIds.has(tourist.uid) ? 'feedback-reviewed' : 'feedback-pending'}`}>
+                          {reviewedTouristIds.has(tourist.uid) ? 'Reviewed' : 'Pending'}
+                        </div>
+                      )}
                     </IonItem>
                   ))
                 ) : (
@@ -747,6 +779,27 @@ const TouristList: React.FC = () => {
                 <div className="detail-info-text">
                   <span className="detail-label">Joined</span>
                   <span className="detail-value">{selectedTourist.joinedAt ? formatDate(selectedTourist.joinedAt) : '—'}</span>
+                </div>
+              </div>
+              <div className="detail-info-item">
+                <IonIcon icon={walkOutline} />
+                <div className="detail-info-text">
+                  <span className="detail-label">Gender</span>
+                  <span className="detail-value">{selectedTourist.gender || '—'}</span>
+                </div>
+              </div>
+              <div className="detail-info-item">
+                <IonIcon icon={walkOutline} />
+                <div className="detail-info-text">
+                  <span className="detail-label">Nationality</span>
+                  <span className="detail-value">{selectedTourist.nationality || '—'}</span>
+                </div>
+              </div>
+              <div className="detail-info-item">
+                <IonIcon icon={walkOutline} />
+                <div className="detail-info-text">
+                  <span className="detail-label">Religion</span>
+                  <span className="detail-value">{selectedTourist.religion || '—'}</span>
                 </div>
               </div>
               <div className="detail-info-item">
@@ -859,7 +912,7 @@ const TouristList: React.FC = () => {
               }
             }}
           >
-            Done
+            Open Feedback QR
           </IonButton>
         </div>
       </IonModal>

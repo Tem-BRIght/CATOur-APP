@@ -299,6 +299,15 @@ const TourSession: React.FC = () => {
     return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
   };
 
+  const formatDuration = (startTime: string, endTime?: string) => {
+    const start = new Date(startTime).getTime();
+    const end = endTime ? new Date(endTime).getTime() : Date.now();
+    const totalMinutes = Math.max(0, Math.floor((end - start) / 60000));
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+    return hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
+  };
+
   if (loading) {
     return (
       <IonPage>
@@ -342,13 +351,15 @@ const TourSession: React.FC = () => {
       <IonContent className="ts-content">
         {/* Session info */}
         <div className="ts-hero">
-          <h1>{session.destinationName}</h1>
+          <h1>{session.tourTypeName || 'Tour Session'}</h1>
+          <p className="ts-destination">{session.destinationName}</p>
           <p className="ts-guide">
-            <IonIcon icon={personOutline} /> Guide: {session.guideName}
+            <IonIcon icon={personOutline} /> Tour Guide Profile: {session.guideName}
           </p>
           <div className="ts-datetime">
             <span><IonIcon icon={calendarOutline} /> {formatDate(session.startTime)}</span>
             <span><IonIcon icon={timeOutline} /> {formatTime(session.startTime)}</span>
+            <span><IonIcon icon={timeOutline} /> {formatDuration(session.startTime, session.endTime)}</span>
           </div>
         </div>
 
@@ -398,6 +409,11 @@ const TourSession: React.FC = () => {
             <span className="ts-status-ended">● The session was cancelled</span>
           ) : (
             <span className="ts-status-ended">● The session is ended</span>
+          )}
+          {session.status === 'Cancelled' && (
+            <p style={{ marginTop: '10px', color: '#b91c1c', lineHeight: 1.5 }}>
+              <strong>Reason:</strong> {session.cancelReason || 'No reason provided'}
+            </p>
           )}
           {!endingRedirect && session.status === 'ended' && (
             <p className="ts-redirect-msg">

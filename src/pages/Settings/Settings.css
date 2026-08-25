@@ -176,6 +176,39 @@ ion-content {
   border: 1px solid #fecaca;
 }
 
+.delete-account-item {
+  color: #f3acac;
+}
+
+.delete-account-item span {
+  color: #f3acac;
+}
+
+.account-deletion-notice {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 16px;
+  border-top: 1px solid #fee2e2;
+  background: #fff7f7;
+  color: #7f1d1d;
+  font-size: 13px;
+}
+
+.account-deletion-notice strong {
+  font-size: 14px;
+}
+
+.account-deletion-notice button {
+  align-self: flex-start;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: #b91c1c;
+  font-weight: 700;
+  cursor: pointer;
+}
+
 /* Footer text */
 .footer {
   text-align: center;

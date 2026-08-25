@@ -253,7 +253,7 @@ const GenerateQR: React.FC = () => {
             : <img src={qrUrl} alt="Session QR Code" className="qr-image" />}
         </div>{!isLoading && <div className={`qr-timer ${expiresIn <= 300 ? 'warning' : ''} ${isExpired ? 'expired-timer' : ''}`}><IonIcon icon={timeOutline} /><span>{isExpired ? 'Tour ended' : `Ends in ${formatTime(expiresIn)}`}</span></div>}</div>
         {!isLoading && <div className="session-badge"><IonIcon icon={checkmarkCircleOutline} /><span>Session ID: {sessionId}</span></div>}
-        <IonButton expand="block" className="view-list-btn" routerLink={`/tourguide/list/${sessionId}`} disabled={!sessionId || isLoading || isExpired}><IonIcon icon={listOutline} slot="start" />{isExpired ? 'Tour Ended' : 'View Tourist List'}</IonButton>
+        <IonButton expand="block" className="view-list-btn" routerLink={`/tourguide/list/${sessionId}`} disabled={!sessionId || isLoading || isExpired}><IonIcon icon={listOutline} slot="start" />{isExpired ? 'Tour Ended' : 'View List'}</IonButton>
         <IonButton expand="block" fill="outline" className="view-list-btn" onClick={generateQR} style={{ marginTop: '8px' }}><IonIcon icon={refreshOutline} slot="start" />Refresh QR</IonButton>
       </>}
     </div></IonContent>

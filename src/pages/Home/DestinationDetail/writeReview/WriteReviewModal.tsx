@@ -161,6 +161,18 @@ const WriteReviewModal: React.FC<Props> = ({
       .finally(() => setProfileLoading(false));
   }, [isOpen, userId, userName, userAvatar]);
 
+  const existingReviewKey = existingReview ? JSON.stringify({
+    overallRating: existingReview.overallRating ?? 0,
+    detailedRatings: existingReview.detailedRatings || {},
+    feeling: existingReview.feeling || '',
+    review: existingReview.review || '',
+    visitDate: existingReview.visitDate || '',
+    companion: existingReview.companion || '',
+    duration: existingReview.duration || '',
+    anonymous: existingReview.anonymous ?? false,
+    allowVenueReply: existingReview.allowVenueReply ?? true,
+  }) : '__new-review__';
+
   /* ── Pre-populate form when editing ────────────────────────────────────── */
   useEffect(() => {
     if (!isOpen) return;
@@ -191,7 +203,7 @@ const WriteReviewModal: React.FC<Props> = ({
     }
     setSubmitError('');
     setSubmitting(false);
-  }, [isOpen, existingReview]);
+  }, [isOpen, existingReviewKey]);
 
   /* helpers */
   const reset = () => {

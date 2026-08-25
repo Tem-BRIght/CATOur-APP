@@ -8,6 +8,7 @@
 
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import { onDocumentCreated } from 'firebase-functions/v2/firestore';
+import { onSchedule } from 'firebase-functions/v2/scheduler';
 import { defineSecret } from 'firebase-functions/params';
 import * as logger from 'firebase-functions/logger';
 import { getApps, initializeApp } from 'firebase-admin/app';
@@ -18,30 +19,10 @@ import { getMessaging } from 'firebase-admin/messaging';
 const GROQ_API_KEY = defineSecret('GROQ_API_KEY');
 const GROQ_API_ENDPOINT = process.env.GROQ_API_ENDPOINT?.trim() || 'https://api.groq.com/openai/v1/chat/completions';
 const GROQ_API_ENDPOINT_SOURCE = process.env.GROQ_API_ENDPOINT ? 'env' : 'default';
-const DEFAULT_MODEL = 'llama-3.3-70b-versatile';
-const FALLBACK_MODELS: string[] = [];
+const DEFAULT_MODEL = process.env.GROQ_MODEL?.trim() || 'llama-3.3-70b-versatile';
+const FALLBACK_MODELS = ['openai/gpt-oss-20b', 'openai/gpt-oss-120b'];
 const MAX_TOKENS_CAP = 600;
 const ALLOWED_ROLES = new Set(['system', 'user', 'assistant']);
-
-export function getGroqModelCandidates(requestedModel?: string): string[] {
-  const preferred = requestedModel?.trim();
-  const seen = new Set<string>();
-  const candidates: string[] = [];
-
-  if (preferred) {
-    seen.add(preferred);
-    candidates.push(preferred);
-  }
-
-  for (const model of [DEFAULT_MODEL, ...FALLBACK_MODELS]) {
-    if (model && !seen.has(model)) {
-      seen.add(model);
-      candidates.push(model);
-    }
-  }
-
-  return candidates;
-}
 
 if (getApps().length === 0) {
   initializeApp();
@@ -138,6 +119,12 @@ interface GroqChatResponse {
   reply: string;
 }
 
+function getGroqModelCandidates(requestedModel?: string): string[] {
+  const candidates = [DEFAULT_MODEL, ...FALLBACK_MODELS, requestedModel?.trim()]
+    .filter((model): model is string => Boolean(model));
+  return [...new Set(candidates)];
+}
+
 export const groqChat = onCall<GroqChatRequest, Promise<GroqChatResponse>>(
   {
     secrets: [GROQ_API_KEY],
@@ -167,13 +154,12 @@ export const groqChat = onCall<GroqChatRequest, Promise<GroqChatResponse>>(
     }
 
     const apiKey = GROQ_API_KEY.value();
-    if (!apiKey || !apiKey.trim()) {
+    if (!apiKey?.trim()) {
       throw new HttpsError('failed-precondition', 'Groq API key is not configured on this Firebase Function.');
     }
 
     const modelCandidates = getGroqModelCandidates(data.model);
-    let lastError: unknown = null;
-
+    let lastError: Error | null = null;
     for (const model of modelCandidates) {
       const body = {
         model,
@@ -215,38 +201,31 @@ export const groqChat = onCall<GroqChatRequest, Promise<GroqChatResponse>>(
             errText: errText.slice(0, 500),
             uid: request.auth.uid,
           });
-
           if (response.status === 401 || response.status === 403) {
-            throw new HttpsError(
-              'failed-precondition',
-              'Groq API rejected the configured API key. Update the GROQ_API_KEY secret and redeploy functions.',
-            );
+            throw new HttpsError('failed-precondition', 'Groq API rejected the configured API key. Update the GROQ_API_KEY secret and redeploy functions.');
           }
-
           if (isModelIssue && model !== modelCandidates[modelCandidates.length - 1]) {
             lastError = new Error(`Groq model ${model} rejected the request (${response.status}).`);
             continue;
           }
-
           throw new HttpsError('internal', `AI service returned an error (${response.status}).`);
         }
 
         const json = await response.json();
         const reply: string | undefined = json.choices?.[0]?.message?.content;
-        if (!reply || !reply.trim()) {
+        if (!reply?.trim()) {
           throw new HttpsError('internal', 'AI service returned an empty response.');
         }
-
         return { reply };
       } catch (err) {
-        lastError = err;
-        if (err instanceof HttpsError) {
-          if (err.code === 'internal' && model !== modelCandidates[modelCandidates.length - 1]) {
-            const message = String(err.message || '');
-            if (/model|unsupported|not found|empty response/i.test(message)) continue;
+        lastError = err instanceof Error ? err : new Error(String(err));
+        if (err instanceof HttpsError && err.code === 'internal') {
+          if (model !== modelCandidates[modelCandidates.length - 1] && /model|unsupported|not found|empty response/i.test(err.message)) {
+            continue;
           }
           throw err;
         }
+        if (err instanceof HttpsError) throw err;
         logger.error('[groqChat] request failed', { model, err, uid: request.auth.uid });
         if (model === modelCandidates[modelCandidates.length - 1]) {
           throw new HttpsError('internal', 'Failed to reach the AI service.');
@@ -254,9 +233,7 @@ export const groqChat = onCall<GroqChatRequest, Promise<GroqChatResponse>>(
       }
     }
 
-    if (lastError instanceof Error) {
-      logger.error('[groqChat] all Groq models failed', { uid: request.auth.uid, lastError: lastError.message });
-    }
+    logger.error('[groqChat] all Groq models failed', { uid: request.auth.uid, lastError: lastError?.message });
     throw new HttpsError('internal', 'Failed to reach the AI service.');
   }
 );
@@ -400,6 +377,60 @@ export const setEmailVerified = onCall<{ targetUid: string; verified: boolean },
   }
 );
 
+export const deleteUserAccount = onCall<{ targetUid: string }, Promise<{ success: boolean }>>(
+  { region: 'us-central1', cors: true },
+  async (request) => {
+    if (!request.auth) {
+      throw new HttpsError('unauthenticated', 'You must be signed in.');
+    }
+
+    const callerUid = request.auth.uid;
+    try {
+      let role = '';
+      const adminDocRef = firestore.collection('admins').doc(callerUid);
+      const adminSnap = await adminDocRef.get();
+      if (adminSnap.exists) {
+        role = (adminSnap.data() as any)?.role || '';
+      } else {
+        const callerEmail = (request.auth.token && (request.auth.token as any).email) || '';
+        if (callerEmail) {
+          const q = await firestore.collection('admins').where('email', '==', callerEmail).limit(1).get();
+          if (!q.empty) {
+            role = (q.docs[0].data() as any)?.role || '';
+          }
+        }
+      }
+
+      if (role !== 'super-admin' && role !== 'admin') {
+        throw new HttpsError('permission-denied', 'Only admins may delete user accounts.');
+      }
+    } catch (err) {
+      if (err instanceof HttpsError) throw err;
+      throw new HttpsError('internal', 'Failed to verify caller permissions.');
+    }
+
+    const targetUid = request.data?.targetUid?.trim();
+    if (!targetUid) {
+      throw new HttpsError('invalid-argument', 'targetUid is required.');
+    }
+
+    try {
+      const userDocRef = firestore.collection('users').doc(targetUid);
+      await firestore.recursiveDelete(userDocRef).catch(() => undefined);
+      await getAuth().deleteUser(targetUid).catch((err: any) => {
+        if (err?.code !== 'auth/user-not-found') throw err;
+      });
+      return { success: true };
+    } catch (err: any) {
+      logger.error('[deleteUserAccount] delete failed', { err, targetUid });
+      if (err?.code === 'auth/user-not-found') {
+        return { success: true };
+      }
+      throw new HttpsError('internal', 'Failed to delete the user account.');
+    }
+  }
+);
+
 export const checkEmailRegistered = onCall<{ email: string }, Promise<{ registered: boolean }>>(
   { region: 'us-central1', cors: true },
   async (request) => {
@@ -470,6 +501,36 @@ export const getUserAuth = onCall<{ targetUid: string }, Promise<{ emailVerified
         throw new HttpsError('not-found', 'Target user not found.');
       }
       throw new HttpsError('internal', 'Failed to fetch user Auth status.');
+    }
+  }
+);
+
+export const permanentlyDeleteScheduledUsers = onSchedule(
+  { schedule: 'every day 03:00', timeZone: 'Asia/Manila', region: 'us-central1' },
+  async () => {
+    const now = new Date();
+    const due = await firestore.collection('users')
+      .where('deletionStatus', '==', 'scheduled')
+      .where('deletionAt', '<=', now)
+      .limit(100)
+      .get();
+
+    for (const userDoc of due.docs) {
+      const uid = userDoc.id;
+      try {
+        await firestore.recursiveDelete(userDoc.ref);
+        for (const ref of [
+          firestore.collection('favorites').doc(uid),
+          firestore.collection('notifications').doc(uid),
+          firestore.collection('aiGuideHistory').doc(uid),
+        ]) {
+          await ref.delete().catch(() => undefined);
+        }
+        await getAuth().deleteUser(uid);
+        logger.info('[permanentlyDeleteScheduledUsers] deleted account', { uid });
+      } catch (err: any) {
+        logger.error('[permanentlyDeleteScheduledUsers] failed', { uid, err });
+      }
     }
   }
 );

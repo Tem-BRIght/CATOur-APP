@@ -70,7 +70,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         return;
       }
       try {
-        const userSnap = await getDoc(doc(firestore, 'users', user.uid));
+        const [userSnap, guideSnap] = await Promise.all([
+          getDoc(doc(firestore, 'users', user.uid)),
+          getDoc(doc(firestore, 'tourGuides', user.uid)),
+        ]);
         const userData = userSnap.exists() ? userSnap.data() : {};
         const userRole = typeof userData?.role === 'string' ? userData.role : undefined;
         const userStatus = typeof userData?.status === 'string' ? userData.status : 'online';
@@ -79,12 +82,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         let nextRole: UserRole = userRole === 'tourguide' ? 'tourguide' : 'user';
         let status = userStatus;
 
-        if (!userRole) {
-          const guideSnap = await getDoc(doc(firestore, 'tourGuides', user.uid));
-          if (guideSnap.exists()) {
-            nextRole = 'tourguide';
-            status = typeof guideSnap.data()?.status === 'string' ? guideSnap.data().status : 'online';
-          }
+        if (!userRole && guideSnap.exists()) {
+          nextRole = 'tourguide';
+          status = typeof guideSnap.data()?.status === 'string' ? guideSnap.data().status : 'online';
         }
 
         setState({

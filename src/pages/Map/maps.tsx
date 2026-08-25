@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { IonContent, IonPage, IonIcon, IonSpinner } from '@ionic/react';
+import { IonPage, IonIcon, IonSpinner } from '@ionic/react';
 import {
   arrowBack,
   close,
@@ -13,7 +13,7 @@ import './maps.css';
 
 import { LoadScript, GoogleMap, MarkerF, InfoWindow } from '@react-google-maps/api';
 
-import { fetchDestinationById, fetchRecommendedDestinations, fetchPopularDestinations } from '../../services/destinationService';
+import { fetchDestinationById, fetchDestinations } from '../../services/destinationService';
 import { useUserLocation } from '../../services/useUserLocation';
 import { formatDistance } from '../../services/distance';
 // routingService walking/directions helpers removed from this file
@@ -47,6 +47,7 @@ const MapPage: React.FC<{ destinationId?: string }> = ({ destinationId }) => {
   const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number }>({ lat: 14.5995, lng: 120.9842 });
   const [mapZoom, setMapZoom] = useState(13);
   const [mapReady, setMapReady] = useState(false);
+  const [mapLoadError, setMapLoadError] = useState(false);
   const [selectedMarkerId, setSelectedMarkerId] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
@@ -74,13 +75,7 @@ const MapPage: React.FC<{ destinationId?: string }> = ({ destinationId }) => {
   useEffect(() => {
     const load = async () => {
       try {
-        const [recommended, popular] = await Promise.all([
-          fetchRecommendedDestinations(),
-          fetchPopularDestinations(),
-        ]);
-        const merged = [...recommended, ...popular];
-        const unique = Array.from(new Map(merged.map(d => [d.id, d])).values());
-        setAllDestinations(unique);
+        setAllDestinations(await fetchDestinations());
       } catch (err) {
         console.error('Failed to load destinations:', err);
         setError('Failed to load destinations.');
@@ -223,6 +218,17 @@ const MapPage: React.FC<{ destinationId?: string }> = ({ destinationId }) => {
     setMapReady(true);
   }, []);
 
+  useEffect(() => {
+    if (mapReady) return;
+    const timer = window.setTimeout(() => setMapLoadError(true), 12000);
+    return () => window.clearTimeout(timer);
+  }, [mapReady]);
+
+  const retryMap = () => {
+    setMapLoadError(false);
+    window.location.reload();
+  };
+
   const handleMarkerClick = (dest: Destination) => {
     const destCoords = resolveCoords(dest);
     if (destCoords && mapRef.current) {
@@ -334,11 +340,19 @@ const MapPage: React.FC<{ destinationId?: string }> = ({ destinationId }) => {
 
   return (
     <IonPage>
-      <IonContent fullscreen scrollY={false}>
-        <div className="map-page-wrapper">
+      <div className="map-page-wrapper">
 
           <div className="map-container">
-            <LoadScript googleMapsApiKey={import.meta.env.VITE_GOOGLE_MAPS_API_KEY}>
+            <LoadScript
+              googleMapsApiKey={import.meta.env.VITE_GOOGLE_MAPS_API_KEY}
+              loadingElement={
+                <div className="map-loading">
+                  <IonSpinner name="crescent" />
+                  <p>Loading map...</p>
+                </div>
+              }
+              onError={() => setMapLoadError(true)}
+            >
               <GoogleMap
                 mapContainerStyle={{ height: '100%', width: '100%' }}
                 center={mapCenter}
@@ -347,7 +361,14 @@ const MapPage: React.FC<{ destinationId?: string }> = ({ destinationId }) => {
                   disableDefaultUI: true,
                   zoomControl: true,
                   streetViewControl: false,
-                  fullscreenControl: false,
+                  fullscreenControl: true,
+                  gestureHandling: 'greedy',
+                  styles: [
+                    {
+                      featureType: 'poi',
+                      stylers: [{ visibility: 'off' }],
+                    },
+                  ],
                 }}
                 onLoad={handleMapLoad}
                 onClick={handleMapClick}
@@ -394,6 +415,12 @@ const MapPage: React.FC<{ destinationId?: string }> = ({ destinationId }) => {
                 
               </GoogleMap>
             </LoadScript>
+            {mapLoadError && !mapReady && (
+              <div className="map-loading map-load-error">
+                <p>Map unavailable on this connection.</p>
+                <button type="button" onClick={retryMap}>Retry map</button>
+              </div>
+            )}
           </div>
 
           <div className="map-ui-layer">
@@ -458,7 +485,7 @@ const MapPage: React.FC<{ destinationId?: string }> = ({ destinationId }) => {
                   className="search-results-panel open"
                   role="listbox"
                   onMouseDown={e => e.preventDefault()}
-                  onTouchStart={() => {
+                  onPointerDown={() => {
                     if (blurTimerRef.current) clearTimeout(blurTimerRef.current);
                   }}
                 >
@@ -547,8 +574,7 @@ const MapPage: React.FC<{ destinationId?: string }> = ({ destinationId }) => {
             )}
 
           </div>{/* end .map-ui-layer */}
-        </div>
-      </IonContent>
+      </div>
     </IonPage>
   );
 };

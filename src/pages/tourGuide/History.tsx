@@ -22,82 +22,39 @@ import {
   checkmarkCircle,
   timeOutline as pendingIcon,
   personOutline,
-  peopleCircleOutline,
   mapOutline,
   cardOutline,
+  walkOutline,
 } from 'ionicons/icons';
 import './History.css';
 import { useAuth } from '../../context/AuthContext';
 import { collection, query, where, orderBy, getDocs } from 'firebase/firestore';
 import { firestore } from '../../firebase';
 
-// Fallback mock sessions — mirrors exactly what TouristList & GroupTouristList save
-const MOCK_SESSION_HISTORY = [
-  {
-    id: 1,
-    date: '2024-01-15',
-    startTime: '2024-01-15T09:30:00',
-    endTime: '2024-01-15T11:45:00',
-    durationSeconds: 8100,
-    tourType: 'Heritage & Historical Tour',
-    destinations: ['Pasig River Esplanade', 'Pasig Museum'],
-    inCharge: 'Juan dela Cruz',
-    tourId: 'TID-2026-0325',
-    tourists: [
-      { id: 1, name: 'John Doe',       email: 'john.doe@email.com',   status: 'Reviewed' },
-      { id: 2, name: 'Jane Smith',     email: 'jane.smith@email.com', status: 'Reviewed' },
-      { id: 3, name: 'Robert Johnson', email: 'robert.j@email.com',   status: 'Pending'  },
-    ],
-  },
-  {
-    id: 2,
-    date: '2024-01-14',
-    startTime: '2024-01-14T14:00:00',
-    endTime: '2024-01-14T16:30:00',
-    durationSeconds: 9000,
-    sessionType: 'group',
-    tourType: 'Cultural Tour',
-    destinations: ['Pasig Museum', 'Bahay ni Tisa', 'Pasig Cathedral Immaculate Conception'],
-    inCharge: 'Carlos Reyes',
-    tourId: 'GRP-2024-088',
-    tourists: [
-      { id: 4, name: 'Maria Garcia', email: 'maria.g@email.com', status: 'Reviewed' },
-      { id: 5, name: 'David Wilson', email: 'david.w@email.com', status: 'Reviewed' },
-      { id: 6, name: 'Sarah Brown',  email: 'sarah.b@email.com', status: 'Reviewed' },
-      { id: 7, name: 'James Miller', email: 'james.m@email.com', status: 'Pending'  },
-    ],
-  },
-];
+const formatSessionDuration = (session: any) => {
+  if (typeof session.durationSeconds === 'number') {
+    const hours = Math.floor(session.durationSeconds / 3600);
+    const minutes = Math.floor((session.durationSeconds % 3600) / 60);
+    return hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
+  }
 
-const loadSessions = () => {
-  try {
-    const saved = localStorage.getItem('tourSessions');
-    if (saved) {
-      const parsed = JSON.parse(saved);
-      return parsed.map((s: any) => ({
-        ...s,
-        tourists: s.tourists.map((t: any) => ({ ...t, status: t.status ?? 'Reviewed' })),
-      }));
-    }
-  } catch (_) {}
-  return MOCK_SESSION_HISTORY;
+  const start = session.startTime ? new Date(session.startTime).getTime() : 0;
+  const end = session.endTime ? new Date(session.endTime).getTime() : Date.now();
+  const totalMinutes = Math.max(0, Math.floor((end - start) / 60000));
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  return hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
 };
-
-/* ── Session type badge — Individual Tour / Group Tour only ── */
-const SessionBadge: React.FC<{ session: any }> = ({ session }) => (
-  <div className={`session-type-badge ${session.sessionType === 'group' ? 'session-type-badge--group' : 'session-type-badge--individual'}`}>
-    <IonIcon icon={session.sessionType === 'group' ? peopleCircleOutline : personOutline} />
-    <span>{session.sessionType === 'group' ? 'Group Tour' : 'Individual Tour'}</span>
-  </div>
-);
 
 /* ── Tour info block — used only in the modal ── */
 const TourInfoBlock: React.FC<{ session: any }> = ({ session }) => (
   <div className="modal-tour-info-card">
 
     <div className="modal-tour-info-row">
+      <IonIcon icon={walkOutline} className="modal-tour-info-icon" />
       <div className="modal-tour-info-text">
         <span className="modal-tour-info-label">Tour Type</span>
+        <span className="modal-tour-info-value">{session.tourTypeName || 'Tour'}</span>
       </div>
     </div>
 
@@ -106,7 +63,18 @@ const TourInfoBlock: React.FC<{ session: any }> = ({ session }) => (
     <div className="modal-tour-info-row modal-tour-info-row--top">
       <IonIcon icon={mapOutline} className="modal-tour-info-icon" />
       <div className="modal-tour-info-text">
+        <span className="modal-tour-info-label">Destination</span>
+        <span className="modal-tour-info-value">{session.destinationName ?? '—'}</span>
+      </div>
+    </div>
 
+    <div className="modal-tour-info-divider" />
+
+    <div className="modal-tour-info-row">
+      <IonIcon icon={timeOutline} className="modal-tour-info-icon" />
+      <div className="modal-tour-info-text">
+        <span className="modal-tour-info-label">Duration</span>
+        <span className="modal-tour-info-value">{formatSessionDuration(session)}</span>
       </div>
     </div>
 
@@ -115,8 +83,8 @@ const TourInfoBlock: React.FC<{ session: any }> = ({ session }) => (
     <div className="modal-tour-info-row">
       <IonIcon icon={personOutline} className="modal-tour-info-icon" />
       <div className="modal-tour-info-text">
-        <span className="modal-tour-info-label">In-charge</span>
-        <span className="modal-tour-info-value">{session.inCharge ?? '—'}</span>
+        <span className="modal-tour-info-label">Tour Guide Profile</span>
+        <span className="modal-tour-info-value">{session.inCharge ?? session.guideName ?? '—'}</span>
       </div>
     </div>
 
@@ -136,7 +104,7 @@ const TourInfoBlock: React.FC<{ session: any }> = ({ session }) => (
 const History: React.FC = () => {
   const [selectedSession, setSelectedSession] = useState<any>(null);
   const [showModal, setShowModal]             = useState(false);
-  const [sessions, setSessions]               = useState<any[]>(() => loadSessions());
+  const [sessions, setSessions]               = useState<any[]>([]);
   const [loading, setLoading]                 = useState(false);
   const history = useHistory();
   const { currentUser } = useAuth();
@@ -158,6 +126,16 @@ const History: React.FC = () => {
         const snap = await getDocs(q);
         if (cancelled) return;
 
+        const feedbackSnap = await getDocs(
+          query(collection(firestore, 'feedback'), where('guideId', '==', currentUser.uid))
+        );
+        const reviewedKeys = new Set(
+          feedbackSnap.docs.map((feedbackDoc) => {
+            const feedback = feedbackDoc.data() as any;
+            return `${feedback.sessionId}_${feedback.touristId}`;
+          })
+        );
+
         const docs = snap.docs
           .map(d => {
             const data: any = d.data();
@@ -170,9 +148,17 @@ const History: React.FC = () => {
               ? data.durationSeconds
               : (start && end ? Math.max(0, Math.floor((end - start) / 1000)) : undefined);
 
+            const tourists = Array.isArray(data.tourists)
+              ? data.tourists.map((tourist: any) => ({
+                  ...tourist,
+                  status: reviewedKeys.has(`${d.id}_${tourist.uid}`) ? 'Reviewed' : 'Pending',
+                }))
+              : [];
+
             return {
               id: d.id,
               ...data,
+              tourists,
               date: data.date || data.startTime || '',
               durationSeconds,
             };
@@ -196,9 +182,13 @@ const History: React.FC = () => {
     return () => { cancelled = true; };
   }, [currentUser?.uid]);
 
-  const formatDateTime = (iso?: string) => {
+  const formatDateTime = (iso?: string, includeSeconds = false) => {
     if (!iso) return '—';
-    return new Date(iso).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+    return new Date(iso).toLocaleTimeString('en-US', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true,
+    });
   };
 
   const formatDate = (iso?: string) => {
@@ -256,8 +246,10 @@ const History: React.FC = () => {
         <div className="history-list">
           <h3>Recent Sessions</h3>
 
-          {sessions.map((session: any) => (
-            <IonCard
+          {sessions.map((session: any) => {
+            const hasPendingFeedback = session.tourists.some((tourist: any) => tourist.status !== 'Reviewed');
+            return (
+              <IonCard
                 key={session.id}
                 className="history-card"
                 onClick={() => { setSelectedSession(session); setShowModal(true); }}
@@ -284,7 +276,7 @@ const History: React.FC = () => {
                   </div>
                   <div className="session-time">
                     <span className="time-label">Ended:</span>
-                    <span className="time-value">{formatDateTime(session.endTime)}</span>
+                    <span className="time-value">{formatDateTime(session.endTime, true)}</span>
                   </div>
                 </div>
 
@@ -303,21 +295,21 @@ const History: React.FC = () => {
                     </span>
                   </div>
                   <div className="session-actions">
-                    <IonButton fill="clear" onClick={(e) => { e.stopPropagation(); handleViewSession(session.id); }}>
-                      View Session
-                    </IonButton>
+                    {session.status === 'ended' && hasPendingFeedback && (
+                      <IonButton fill="clear" onClick={(e) => { e.stopPropagation(); history.push(`/feedback-qr/${session.id}`); }}>
+                        Feedback QR
+                      </IonButton>
+                    )}
                     <IonButton fill="clear" onClick={(e) => { e.stopPropagation(); history.push(`/reviews/${session.id}`); }}>
                       Feedback
                     </IonButton>
                   </div>
                 </div>
 
-                {/* Session type badge */}
-                <SessionBadge session={session} />
-
               </IonCardContent>
             </IonCard>
-          ))}
+            );
+          })}
         </div>
 
       </IonContent>
@@ -331,9 +323,6 @@ const History: React.FC = () => {
               <h2>Session Details</h2>
               <IonButton fill="clear" onClick={() => setShowModal(false)} className="close-button">✕</IonButton>
             </div>
-
-            {/* Session type badge */}
-            <SessionBadge session={selectedSession} />
 
             {/* Tour info card */}
             <TourInfoBlock session={selectedSession} />
@@ -352,7 +341,7 @@ const History: React.FC = () => {
               <div className="modal-dt-divider" />
               <div className="modal-dt-item">
                 <span className="modal-dt-label">Ended</span>
-                <span className="modal-dt-value">{formatDateTime(selectedSession.endTime)}</span>
+                <span className="modal-dt-value">{formatDateTime(selectedSession.endTime, true)}</span>
               </div>
               <div className="modal-dt-divider" />
               <div className="modal-dt-item">
@@ -387,9 +376,11 @@ const History: React.FC = () => {
             </div>
 
             <div className="modal-footer">  
-              <IonButton expand="block" className="feedback-modal-btn" onClick={() => { setShowModal(false); handleViewSession(selectedSession.id); }}>
-                View Session
-              </IonButton>
+              {selectedSession.status === 'ended' && selectedSession.tourists.some((tourist: any) => tourist.status !== 'Reviewed') && (
+                <IonButton expand="block" className="feedback-modal-btn" onClick={() => { setShowModal(false); history.push(`/feedback-qr/${selectedSession.id}`); }}>
+                  Feedback QR
+                </IonButton>
+              )}
               <IonButton expand="block" className="feedback-modal-btn" onClick={() => { setShowModal(false); history.push(`/reviews/${selectedSession.id}`); }}>
                 Feedback
               </IonButton>

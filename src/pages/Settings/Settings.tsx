@@ -31,37 +31,13 @@ import {
   checkmarkCircle,
   ellipseOutline,
 } from 'ionicons/icons';
-import { doc, onSnapshot, Unsubscribe } from 'firebase/firestore';
+import { doc, onSnapshot, setDoc, Timestamp, Unsubscribe } from 'firebase/firestore';
 import { firestore } from '../../firebase';
 
 import { useAuth } from '../../context/AuthContext';
-import { UserProfile } from '../../services/userProfileService';
+import { getProfileCompletion, UserProfile } from '../../services/userProfileService';
 import { getProfilePicCache } from '../../utils/profileImageStorage';
 import './Settings.css';
-
-// Matches the admin's 12-field formula exactly:
-// firstname, surname, nickname, email, contactNumber,
-// dateOfBirth, gender, nationality, religion, brgy, city, region
-function getProfileCompletion(profile: UserProfile | null): number {
-  if (!profile) return 0;
-  const addr = profile.address as { brgy?: string; city?: string; region?: string } | undefined;
-  const checks = [
-    !!profile.name?.firstname?.trim(),
-    !!profile.name?.surname?.trim(),
-    !!profile.nickname?.trim(),
-    !!profile.email?.trim(),
-    !!profile.contactNumber?.trim(),
-    !!profile.dateOfBirth?.trim(),
-    !!profile.gender?.trim(),
-    !!profile.nationality?.trim(),
-    !!profile.religion?.trim(),
-    !!addr?.brgy?.trim(),
-    !!addr?.city?.trim(),
-    !!addr?.region?.trim(),
-  ];
-  return Math.round((checks.filter(Boolean).length / 12) * 100);
-}
-
 
 const Settings: React.FC = () => {
   const router = useIonRouter();
@@ -70,6 +46,8 @@ const Settings: React.FC = () => {
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [showLogoutAlert, setShowLogoutAlert] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
+  const [showDeleteAccountAlert, setShowDeleteAccountAlert] = useState(false);
+  const [deletingAccount, setDeletingAccount] = useState(false);
 
   // Keep ref to unsubscribe so we can clean up
   const unsubRef = useRef<Unsubscribe | null>(null);
@@ -130,7 +108,7 @@ const Settings: React.FC = () => {
       case 'My Reviews':       router.push('/my-reviews');                  break;
       case 'Tour Guide':       router.push('/tour');                        break;
       case 'Scan':             router.push('/scan');                        break;
-      case 'Privacy Settings': router.push('/settings/privacy');            break;
+      case 'Privacy Settings': router.push('/settings/permissions');       break;
       case 'Help Center':      router.push('/settings/help');               break;
       case 'Contact Support':  router.push('/settings/contact-support');    break;
       case 'Report Problem':   router.push('/settings/report-problem');     break;
@@ -150,11 +128,49 @@ const Settings: React.FC = () => {
     }
     try {
       await logout();
-      router.push('/login', 'root', 'replace');
     } catch (err) {
       console.error('[Settings] Logout failed:', err);
     } finally {
       setLoggingOut(false);
+    }
+  };
+
+  const deletionDate = userProfile?.deletionAt instanceof Timestamp
+    ? userProfile.deletionAt.toDate()
+    : userProfile?.deletionAt ? new Date(userProfile.deletionAt) : null;
+
+  const handleDeleteAccount = async () => {
+    if (!user?.uid || deletingAccount) return;
+    setDeletingAccount(true);
+    try {
+      const deleteAfter = new Date();
+      deleteAfter.setDate(deleteAfter.getDate() + 30);
+      await setDoc(doc(firestore, 'users', user.uid), {
+        deletionStatus: 'scheduled',
+        deletionAt: Timestamp.fromDate(deleteAfter),
+      }, { merge: true });
+      await logout();
+      router.push('/login', 'root', 'replace');
+    } catch (err) {
+      console.error('[Settings] Account deletion scheduling failed:', err);
+    } finally {
+      setDeletingAccount(false);
+      setShowDeleteAccountAlert(false);
+    }
+  };
+
+  const handleCancelAccountDeletion = async () => {
+    if (!user?.uid || deletingAccount) return;
+    setDeletingAccount(true);
+    try {
+      await setDoc(doc(firestore, 'users', user.uid), {
+        deletionStatus: 'active',
+        deletionAt: null,
+      }, { merge: true });
+    } catch (err) {
+      console.error('[Settings] Account deletion cancellation failed:', err);
+    } finally {
+      setDeletingAccount(false);
     }
   };
 
@@ -269,6 +285,7 @@ const Settings: React.FC = () => {
         <div className="section">
           <p className="section-title">Support</p>
           <div className="card">
+            <Item icon={shieldCheckmarkOutline} color="cyan" label="Privacy Settings" onClick={() => onItemClick('Privacy Settings')} />
             <Item icon={helpCircleOutline} color="cyan" label="Help Center"     onClick={() => onItemClick('Help Center')}     />
             <Item icon={headsetOutline}    color="mint" label="Contact Support" onClick={() => onItemClick('Contact Support')} />
             <Item icon={warningOutline}    color="red"  label="Report Problem"  onClick={() => onItemClick('Report Problem')}  />
@@ -281,6 +298,21 @@ const Settings: React.FC = () => {
           <div className="card">
             <Item icon={phonePortraitOutline} color="gray" label="About App"       onClick={() => onItemClick('About App')}       />
             <Item icon={documentTextOutline}  color="gray" label="Terms & Privacy" onClick={() => onItemClick('Terms & Privacy')} />
+            {deletionDate ? (
+              <div className="account-deletion-notice">
+                <strong>Scheduled for deletion</strong>
+                <span>Your account will be permanently deleted on {deletionDate.toLocaleDateString()}.</span>
+                <button type="button" onClick={handleCancelAccountDeletion} disabled={deletingAccount}>
+                  {deletingAccount ? 'Restoring…' : 'Cancel deletion'}
+                </button>
+              </div>
+            ) : (
+              <div className="item delete-account-item" onClick={() => setShowDeleteAccountAlert(true)}>
+                <div className="icon outline"><IonIcon icon={warningOutline} /></div>
+                <span>Delete Account</span>
+                <IonIcon icon={chevronForwardOutline} className="arrow" />
+              </div>
+            )}
             <Item
               icon={logOutOutline}
               color="red-outline"
@@ -288,6 +320,7 @@ const Settings: React.FC = () => {
               onClick={() => setShowLogoutAlert(true)}
               extraClass="logout"
             />
+            
           </div>
 
           <div className="footer">
@@ -308,6 +341,16 @@ const Settings: React.FC = () => {
           buttons={[
             { text: 'Cancel', role: 'cancel' },
             { text: 'Logout', handler: handleLogout },
+          ]}
+        />
+        <IonAlert
+          isOpen={showDeleteAccountAlert}
+          onDidDismiss={() => setShowDeleteAccountAlert(false)}
+          header="Schedule account deletion?"
+          message="Your account will remain recoverable for 30 days, then be permanently deleted."
+          buttons={[
+            { text: 'Cancel', role: 'cancel' },
+            { text: deletingAccount ? 'Scheduling…' : 'Schedule deletion', role: 'destructive', handler: handleDeleteAccount },
           ]}
         />
 

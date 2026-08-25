@@ -89,12 +89,14 @@ const ProximityAITalkingOverlay: React.FC = () => {
       if (!trimmed) return;
 
       const routeMatch = proximityAI?.resolveDestinationFromText?.(trimmed);
-      if (routeMatch && /show.*(map|route)|going to|heading to|go to|route to/i.test(trimmed)) {
+      const isRouteRequest = /show.*(map|route)|going (to|there)|heading (to|there)|go(ing)? to|route to|directions?/i.test(trimmed);
+      const routeDestination = routeMatch ?? (isRouteRequest ? proximityAI?.destination : null);
+      if (routeDestination) {
         const routeTarget = {
-          id: routeMatch.id,
-          lat: routeMatch.lat,
-          lng: routeMatch.lng,
-          location: { lat: routeMatch.lat, lng: routeMatch.lng },
+          id: routeDestination.id,
+          lat: routeDestination.lat,
+          lng: routeDestination.lng,
+          location: { lat: routeDestination.lat, lng: routeDestination.lng },
         };
 
         setRouteDestination(routeTarget);
@@ -119,8 +121,9 @@ const ProximityAITalkingOverlay: React.FC = () => {
   // early-return check has to come after all of them, not before.
   if (!proximityAI) return null;
 
+  const currentPath = location.pathname.toLowerCase();
   const isTouristPage = ['/home', '/popular', '/recommended', '/notifications', '/maps', '/destination']
-    .some(path => location.pathname.startsWith(path));
+    .some(path => currentPath.startsWith(path));
   if (!isTouristPage) return null;
 
   const { status, destination, narration, isGenericMode } = proximityAI;

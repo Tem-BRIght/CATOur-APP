@@ -37,6 +37,7 @@ export interface TourSchedule {
 export interface TourGuideSchedule {
   guideId: string;
   guideName: string;
+  guidePhotoUrl?: string;
   destinationName: string;
   destinationId: string;
   date: string;
@@ -117,8 +118,12 @@ export async function getTourTypesWithSchedules(): Promise<TourTypeWithSchedules
   })();
   console.debug('[tourScheduleService] getTourTypesWithSchedules — today=', today);
 
-  // 1. Fetch all tour types
-  const tourTypesSnap = await getDocs(collection(db, 'tourTypes'));
+  // Fetch independent collections together so the page waits for one network
+  // round trip instead of two.
+  const [tourTypesSnap, guidesSnap] = await Promise.all([
+    getDocs(collection(db, 'tourTypes')),
+    getDocs(collection(db, 'tourGuides')),
+  ]);
   if (tourTypesSnap.empty) return [];
 
   const tourTypesMap = new Map<
@@ -135,8 +140,6 @@ export async function getTourTypesWithSchedules(): Promise<TourTypeWithSchedules
     });
   });
 
-  // 2. Fetch all tour guides
-  const guidesSnap = await getDocs(collection(db, 'tourGuides'));
   const result: TourTypeWithSchedules[] = [];
 
   // 3. For each tour type, find matching guides with a slot assigned TODAY
@@ -165,6 +168,7 @@ export async function getTourTypesWithSchedules(): Promise<TourTypeWithSchedules
       guides.push({
         guideId: guideDoc.id,
         guideName: `${guideData.firstName || ''} ${guideData.lastName || ''}`.trim() || 'Unknown Guide',
+        guidePhotoUrl: guideData.photoUrl || guideData.img || '',
         destinationName: guideData.assignedDestName || 'Unknown',
         destinationId: guideData.assignedDestId || '',
         date: upcomingSlots[0]?.date || today,
@@ -200,16 +204,18 @@ export async function getTourTypesWithSchedules(): Promise<TourTypeWithSchedules
 
   if (allDestIds.length > 0) {
     const placeNameById = new Map<string, string>();
-    for (let i = 0; i < allDestIds.length; i += 30) {
-      const chunk = allDestIds.slice(i, i + 30);
-      const destsSnap = await getDocs(
-        query(collection(db, 'destinations'), where(documentId(), 'in', chunk))
-      );
+    const destinationSnaps = await Promise.all(
+      Array.from({ length: Math.ceil(allDestIds.length / 30) }, (_, index) => {
+        const chunk = allDestIds.slice(index * 30, index * 30 + 30);
+        return getDocs(query(collection(db, 'destinations'), where(documentId(), 'in', chunk)));
+      })
+    );
+    destinationSnaps.forEach((destsSnap) => {
       destsSnap.docs.forEach((d) => {
         const data = d.data() as any;
         placeNameById.set(d.id, data.title || data.name || 'Untitled');
       });
-    }
+    });
 
     result.forEach((t) => {
       const ids = tourTypesMap.get(t.id)?.destinationIds || [];
@@ -230,6 +236,7 @@ export async function getTourTypesWithSchedules(): Promise<TourTypeWithSchedules
 export interface UpcomingSlotEntry extends TourSlot {
   guideId: string;
   guideName: string;
+  guidePhotoUrl?: string;
 }
 
 export interface UpcomingSlotGroup {
@@ -273,6 +280,7 @@ export async function getUpcomingSlotsForTourType(typeId: string): Promise<Upcom
     if (!tourTypeIds.includes(typeId)) return;
 
     const guideName = `${guideData.firstName || ''} ${guideData.lastName || ''}`.trim() || 'Unknown Guide';
+    const guidePhotoUrl = guideData.photoUrl || guideData.img || '';
     const rawSlots: any[] = guideData.availabilitySlots || [];
 
     rawSlots
@@ -289,6 +297,7 @@ export async function getUpcomingSlotsForTourType(typeId: string): Promise<Upcom
           rawIndex: s.rawIndex,
           guideId: guideDoc.id,
           guideName,
+          guidePhotoUrl,
         };
         const bucket = byDate.get(s.date) || [];
         bucket.push(entry);
@@ -466,6 +475,12 @@ export async function joinTour(
       date: bookedSlot.date,
       startTime: bookedSlot.startTime,
       endTime: bookedSlot.endTime,
+      initialTourist: {
+        uid: userId,
+        name: tourist.name || 'Tourist',
+        email: tourist.email || '',
+        joinedAt: new Date().toISOString(),
+      },
     });
 
     await addTouristToSession(session.id, {

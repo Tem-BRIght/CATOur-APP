@@ -7,7 +7,7 @@ import {
   IonGrid, IonRow, IonCol,
 } from '@ionic/react';
 import { useHistory } from 'react-router-dom';
-import { collection, getDocs } from 'firebase/firestore';
+import { collection, getDocs, limit, orderBy, query } from 'firebase/firestore';
 import { firestore } from '../../../firebase';
 import {
   star, location, heart, heartOutline, funnelOutline, close,
@@ -42,7 +42,7 @@ const PopularAll: React.FC = () => {
       try {
         const [data, visitsSnap] = await Promise.all([
           fetchPopularDestinations(),
-          getDocs(collection(firestore, 'visits')),
+          getDocs(query(collection(firestore, 'visits'), orderBy('createdAt', 'desc'), limit(500))),
         ]);
 
         setDestinations(data ?? []);

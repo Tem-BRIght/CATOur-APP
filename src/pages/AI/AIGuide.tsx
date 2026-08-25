@@ -59,6 +59,35 @@ interface ChatMessage {
   showRouteToId?: string;
 }
 
+function getDisplayReply(value: unknown): string {
+  let current: unknown = value;
+
+  for (let depth = 0; depth < 3; depth += 1) {
+    if (typeof current === 'object' && current !== null) {
+      const reply = (current as { reply?: unknown }).reply;
+      if (typeof reply === 'string') current = reply;
+      else break;
+    }
+
+    if (typeof current !== 'string') break;
+    const text = current.trim();
+    if (!text.startsWith('{')) return text;
+
+    try {
+      current = JSON.parse(text);
+    } catch {
+      return text;
+    }
+  }
+
+  if (typeof current === 'object' && current !== null) {
+    const reply = (current as { reply?: unknown }).reply;
+    if (typeof reply === 'string') return reply.trim();
+  }
+
+  return typeof current === 'string' ? current.trim() : '';
+}
+
 interface PlaceSuggestion {
   id: string;
   title: string;
@@ -172,6 +201,12 @@ export const IntegratedRouteMap: React.FC<{
             zoomControl: true,
             gestureHandling: 'greedy',
             clickableIcons: true,
+            styles: [
+              {
+                featureType: 'poi',
+                stylers: [{ visibility: 'off' }],
+              },
+            ],
           }}
         >
           {origin && <MarkerF position={origin} label="You" />}
@@ -672,10 +707,6 @@ const AIGuide: React.FC = () => {
     setIsThinking(true);
 
     try {
-      // Small pacing delay so the "Searching…" / "Thinking…" indicators are
-      // actually visible instead of flashing for a network-speed instant.
-      await new Promise(res => setTimeout(res, 400));
-
       // Keep last 6 turns for context, excluding the message we're about to
       // send (askAIGuide takes that separately as `message`).
       const chatHistory: ChatTurn[] = conversationHistory
@@ -686,11 +717,8 @@ const AIGuide: React.FC = () => {
           text: msg.text,
         }));
 
-      const latestLocation = userLocation ?? await getCurrentGuideLocation();
-      if (!userLocation && latestLocation) setUserLocation(latestLocation);
-
-      const coords = latestLocation
-        ? { latitude: latestLocation.lat, longitude: latestLocation.lng }
+      const coords = userLocation
+        ? { latitude: userLocation.lat, longitude: userLocation.lng }
         : null;
 
       const response = await askAIGuide({
@@ -705,7 +733,7 @@ const AIGuide: React.FC = () => {
         .map(id => placesById.get(id))
         .filter((p): p is PlaceSuggestion => !!p);
 
-      return { text: response.reply, places: suggestedPlaces, showRouteToId: response.showRouteToId };
+      return { text: getDisplayReply(response.reply), places: suggestedPlaces, showRouteToId: response.showRouteToId };
     } catch (error) {
       console.error('Error generating AI response:', error);
       return {

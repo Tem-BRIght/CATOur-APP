@@ -59,10 +59,9 @@ const Reviews: React.FC = () => {
           return;
         }
 
-        const q = query(
-          collection(firestore, 'feedback'),
-          where('guideId', '==', guideUid)
-        );
+        const q = sessionId
+          ? query(collection(firestore, 'feedback'), where('sessionId', '==', sessionId))
+          : query(collection(firestore, 'feedback'), where('guideId', '==', guideUid));
         const snap = await getDocs(q);
         const data = snap.docs
           .map(d => ({ id: d.id, ...(d.data() as any) }))
@@ -71,7 +70,10 @@ const Reviews: React.FC = () => {
             const bTs = b.createdAt && typeof b.createdAt?.toDate === 'function' ? b.createdAt.toDate().getTime() : new Date(b.createdAt || 0).getTime();
             return bTs - aTs;
           });
-        setReviews(data);
+        const sessionReviews = sessionId
+          ? data.filter((review: any) => review.sessionId === sessionId)
+          : data;
+        setReviews(sessionReviews);
 
         // Cross-reference every ended session's tourist list against the
         // feedback docs above to find tourists who joined but never reviewed.
@@ -80,11 +82,12 @@ const Reviews: React.FC = () => {
           query(collection(firestore, 'sessions'), where('guideId', '==', guideUid))
         );
 
-        const reviewedKeys = new Set(data.map((r: any) => `${r.sessionId}_${r.touristId}`));
+        const reviewedKeys = new Set(sessionReviews.map((r: any) => `${r.sessionId}_${r.touristId}`));
         const pendingList: typeof pending = [];
 
         sessionsSnap.docs.forEach((sDoc) => {
           const s = { id: sDoc.id, ...sDoc.data() } as TourSession;
+          if (sessionId && s.id !== sessionId) return;
           if (s.status !== 'ended') return; // only ended tours are eligible for feedback
           (s.tourists || []).forEach((t) => {
             const key = `${s.id}_${t.uid}`;
@@ -253,6 +256,9 @@ const Reviews: React.FC = () => {
                       <div className="reviews-card-stars">
                         {renderStars(review.rating || 0, review.id)}
                       </div>
+                      <p className="reviews-card-author">
+                        {review.touristName || 'Tourist'}
+                      </p>
                       <p className="reviews-card-comment">
                         {review.comment ? `"${review.comment}"` : 'No comment provided.'}
                       </p>

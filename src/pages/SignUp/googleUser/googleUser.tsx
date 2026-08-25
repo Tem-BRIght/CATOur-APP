@@ -92,6 +92,21 @@ const GoogleUserProfile: React.FC = () => {
     }
   };
 
+  const ageValidationLabel = (() => {
+    if (!dateOfBirth) return '';
+    const dob = new Date(dateOfBirth);
+    const today = new Date();
+    let calculatedAge = today.getFullYear() - dob.getFullYear();
+    const monthDifference = today.getMonth() - dob.getMonth();
+    if (monthDifference < 0 || (monthDifference === 0 && today.getDate() < dob.getDate())) calculatedAge--;
+    if (Number.isNaN(dob.getTime()) || dob > today) return 'Enter a valid date of birth.';
+    if (calculatedAge < 10) return 'You must be at least 10 years old.';
+    return `Age: ${calculatedAge} years old`;
+  })();
+
+  const ageValidationError = ageValidationLabel === 'Enter a valid date of birth.' ||
+    ageValidationLabel === 'You must be at least 10 years old.';
+
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -121,6 +136,15 @@ const GoogleUserProfile: React.FC = () => {
     }
     if (!address.trim()) {
       setAlert({ header: 'Missing Address', message: 'Please enter your full address.', show: true });
+      return;
+    }
+    const dob = new Date(dateOfBirth);
+    const today = new Date();
+    let calculatedAge = today.getFullYear() - dob.getFullYear();
+    const monthDifference = today.getMonth() - dob.getMonth();
+    if (monthDifference < 0 || (monthDifference === 0 && today.getDate() < dob.getDate())) calculatedAge--;
+    if (Number.isNaN(dob.getTime()) || dob > today || calculatedAge < 10) {
+      setAlert({ header: 'Age Requirement', message: 'You must be at least 10 years old to create an account.', show: true });
       return;
     }
     if (!selectedReligion) {
@@ -258,6 +282,9 @@ const GoogleUserProfile: React.FC = () => {
             <IonItem className="input-item">
               <IonInput placeholder="Auto-filled from date of birth" type="number" value={age} onIonChange={(e) => setAge(e.detail.value!)} className="text-input" />
             </IonItem>
+            <IonLabel className={`age-validation-label${ageValidationError ? ' age-validation-label--error' : ''}`}>
+              {ageValidationLabel}
+            </IonLabel>
 
             {/* Username */}
             <IonLabel position="stacked" className="signup-3-label">Username</IonLabel>

@@ -114,6 +114,36 @@ describe('joined session fallback', () => {
     expect(latest[0].guideName).toBe('Guide One');
     expect(latest[0].startTime).toBe('11:30');
   });
+
+  it('keeps cancelled sessions visible so tourists can see the cancellation reason', () => {
+    const existingSessions = [
+      {
+        id: 'session-cancelled',
+        guideId: 'guide-1',
+        guideName: 'Guide One',
+        destinationId: 'dest-1',
+        destinationName: 'Old Town',
+        startTime: '2026-06-01T08:00:00.000Z',
+        tourists: [],
+        touristUids: ['current-user'],
+        status: 'Cancelled',
+        cancelReason: 'Guide was unavailable',
+        createdAt: '2026-06-01T00:00:00.000Z',
+      },
+    ] as any[];
+
+    const fallback = buildJoinedSessionFallbacks('current-user', existingSessions, []);
+
+    expect(fallback).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: 'session-cancelled',
+          status: 'Cancelled',
+          cancelReason: 'Guide was unavailable',
+        }),
+      ])
+    );
+  });
 });
 
 describe('session lifecycle logging', () => {
@@ -162,6 +192,10 @@ describe('session lifecycle logging', () => {
       data: () => ({
         completedStops: [],
         destinationName: 'Old Town Walk',
+        guideName: 'Guide One',
+        tourists: [
+          { uid: 'tourist-1', name: 'Tourist One', email: 'one@example.com', joinedAt: '2026-08-23T09:00:00.000Z' },
+        ],
       }),
     }).mockResolvedValueOnce({
       exists: () => true,
@@ -174,6 +208,14 @@ describe('session lifecycle logging', () => {
       expect.anything(),
       expect.objectContaining({
         completedStops: { __arrayUnion: 'dest-42' },
+        visitedStops: {
+          __arrayUnion: expect.objectContaining({
+            destinationId: 'dest-42',
+            destinationName: 'Pasig Museum',
+            touristUids: ['tourist-1'],
+            tourists: [expect.objectContaining({ uid: 'tourist-1' })],
+          }),
+        },
       })
     );
 
@@ -183,6 +225,25 @@ describe('session lifecycle logging', () => {
         type: 'checkin',
         title: expect.stringContaining('Destination visited: Pasig Museum'),
         sessionId: 'tour-1',
+        extra: expect.objectContaining({
+          touristUids: ['tourist-1'],
+          touristCount: 1,
+        }),
+      })
+    );
+  });
+
+  it('stores the cancellation reason when a tour is cancelled', async () => {
+    const { updateSessionStatus } = await import('./sessionService');
+
+    await updateSessionStatus('tour-1', 'Cancelled', 'Guide was unavailable');
+
+    expect(updateDocMock).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        status: 'Cancelled',
+        cancelReason: 'Guide was unavailable',
+        cancelledAt: expect.any(String),
       })
     );
   });

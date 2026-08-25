@@ -117,13 +117,6 @@ function writeCache<T>(key: string, data: T): void {
   }
 }
 
-function cacheSafeDestination(destination: Destination): Destination {
-  const cached = { ...destination };
-  if (cached.image?.startsWith('data:')) delete cached.image;
-  if (cached.imageUrl?.startsWith('data:')) delete cached.imageUrl;
-  return cached;
-}
-
 function readCache<T>(key: string): { data: T; isStale: boolean } | null {
   try {
     const raw = localStorage.getItem(key);
@@ -141,10 +134,9 @@ function readCache<T>(key: string): { data: T; isStale: boolean } | null {
  *  by-id entry so fetchDestinationById() can serve a single-item cache
  *  hit without needing the full list to have loaded first. */
 function cacheDestinationsList(destinations: Destination[]): void {
-  const cacheSafeDestinations = destinations.map(cacheSafeDestination);
-  writeCache(CACHE_KEY_ALL, cacheSafeDestinations);
+  writeCache(CACHE_KEY_ALL, destinations);
   destinations.forEach(d => {
-    writeCache(`${CACHE_KEY_BY_ID_PREFIX}${d.id}`, cacheSafeDestination(d));
+    writeCache(`${CACHE_KEY_BY_ID_PREFIX}${d.id}`, d);
   });
 }
 
@@ -191,7 +183,7 @@ export const fetchDestinationById = async (id: string): Promise<Destination | nu
     const snap = await getDoc(doc(firestore, COLLECTION, id));
     if (!snap.exists()) return null;
     const destination = normalise(snap.id, snap.data());
-    writeCache(`${CACHE_KEY_BY_ID_PREFIX}${id}`, cacheSafeDestination(destination)); // cache on success
+    writeCache(`${CACHE_KEY_BY_ID_PREFIX}${id}`, destination); // cache on success
     return destination;
   } catch (err) {
     console.error('[destinationService] fetchDestinationById failed:', err);
@@ -432,7 +424,7 @@ export function subscribeDestinationById(
     (snap) => {
       if (!snap.exists()) { onChange(null); return; }
       const destination = normalise(snap.id, snap.data());
-      writeCache(`${CACHE_KEY_BY_ID_PREFIX}${id}`, cacheSafeDestination(destination)); // cache
+      writeCache(`${CACHE_KEY_BY_ID_PREFIX}${id}`, destination); // cache
       onChange(destination);
     },
     (err) => {

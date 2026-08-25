@@ -49,8 +49,23 @@ const callGroqChat = httpsCallable<GroqChatRequest, GroqChatResponse>(functions,
 const DIRECTIONS_INTENT =
   /\b(direction|route|how (do|can|to) i get|how far|way to get|paano (ako )?(pumunta|makarating|makakarating)|papaano|paano po|saan (ang daan|papunta)|malayo ba|gaano kalayo)\b/i;
 
+const FOLLOWUP_ROUTE_INTENT =
+  /\b(going there|heading there|go there|take me there|route there|directions there)\b/i;
+
+const MAP_INTENT =
+  /\b(show|display|open|view|give)\s+(me\s+)?(a\s+)?map\b|\bmap\b/i;
+
+const DESTINATIONS_INTENT =
+  /\b(destination|destinations|place|places|spot|spots|attraction|attractions|where can i go)\b/i;
+
 const WEATHER_INTENT =
   /\b(weather|forecast|climate|temperature|is it (raining|hot|cold)|panahon|ulan|umuulan|mainit ba|malamig ba|storm|bagyo)\b/i;
+
+const RATING_INTENT =
+  /\b(highest[- ]rated|best[- ]rated|top[- ]rated|most[- ]rated|highest ratings?|best ratings?|most ratings?|most reviews?)\b/i;
+
+const VISITS_INTENT =
+  /\b(most visited|most visits|top visited|most popular|popular places?|top destinations?)\b/i;
 
 // ── Public types ──────────────────────────────────────────────────────────────
 
@@ -153,15 +168,23 @@ function getCoords(dest: Destination): { lat: number; lng: number } | null {
   return lat != null && lng != null ? { lat, lng } : null;
 }
 
-function findDestinationForQuestion(message: string, ranked: RankedDestination[]): Destination | null {
-  const normalized = message.toLowerCase();
+function findDestinationForQuestion(
+  message: string,
+  ranked: RankedDestination[],
+  history: ChatTurn[] = [],
+): Destination | null {
+  const searchableText = [
+    message,
+    ...history.slice().reverse().slice(0, 4).map(turn => turn.text),
+  ].join(' ').toLowerCase();
   const churchTerms = /\b(church|cathedral|simbahan)\b/i.test(message);
 
   return ranked.find(({ dest }) => {
     const value = dest as any;
     const title = `${value.title || ''} ${value.name || ''}`.toLowerCase();
     const category = `${value.category || ''} ${(value.tags || []).join(' ')}`.toLowerCase();
-    return (title.length > 2 && normalized.includes(title))
+    const names = [value.title, value.name].filter(Boolean).map((name: string) => name.toLowerCase());
+    return (names.some((name: string) => name.length > 2 && searchableText.includes(name)))
       || (churchTerms && /church|cathedral|religious/.test(category));
   })?.dest ?? null;
 }
@@ -208,6 +231,33 @@ function buildCatalogText(ranked: RankedDestination[]): string {
       return `- ID:${dest.id} | ${name} | ${category} | rating ${rating} (${reviews} reviews)${distancePart} | ${desc}`;
     })
     .join('\n');
+}
+
+function getRequestedRecommendationIds(message: string, ranked: RankedDestination[]): string[] | null {
+  const wantsRatingOrder = RATING_INTENT.test(message);
+  const wantsVisitOrder = VISITS_INTENT.test(message);
+  if (!wantsRatingOrder && !wantsVisitOrder && !DESTINATIONS_INTENT.test(message)) return null;
+
+  const ordered = [...ranked].sort((a, b) => {
+    const aData = a.dest as any;
+    const bData = b.dest as any;
+
+    if (wantsRatingOrder) {
+      return (Number(bData.rating) || 0) - (Number(aData.rating) || 0)
+        || (Number(bData.reviews) || 0) - (Number(aData.reviews) || 0);
+    }
+
+    if (wantsVisitOrder) {
+      const aRank = Number(aData.ranking ?? aData.mostVisitedRank);
+      const bRank = Number(bData.ranking ?? bData.mostVisitedRank);
+      if (Number.isFinite(aRank) && Number.isFinite(bRank) && aRank !== bRank) return aRank - bRank;
+      if (Number.isFinite(aRank) !== Number.isFinite(bRank)) return Number.isFinite(aRank) ? -1 : 1;
+    }
+
+    return b.score - a.score;
+  });
+
+  return ordered.slice(0, MAX_RECOMMENDATIONS).map(({ dest }) => dest.id);
 }
 
 // ── Per-user history (searches + visited places) ─────────────────────────────
@@ -290,20 +340,44 @@ const FALLBACK_RESPONSE: AIGuideResponse = {
 
 function safeParseAIGuideJSON(text: string, ranked: RankedDestination[]): AIGuideResponse {
   const validIds = new Set(ranked.map(r => r.dest.id));
-  try {
-    const cleaned = text.trim().replace(/^```json\s*/i, '').replace(/```$/i, '').trim();
-    const parsed = JSON.parse(cleaned);
-    const reply = typeof parsed.reply === 'string' && parsed.reply.trim()
-      ? parsed.reply.trim()
-      : FALLBACK_RESPONSE.reply;
-    const ids: string[] = Array.isArray(parsed.recommendedDestinationIds)
-      ? parsed.recommendedDestinationIds.filter((id: unknown) => typeof id === 'string' && validIds.has(id))
-      : [];
-    return { reply, recommendedDestinationIds: ids.slice(0, MAX_RECOMMENDATIONS) };
-  } catch (err) {
-    console.warn('[aiGuideService] failed to parse AI JSON, showing raw text:', err);
-    return { reply: text.trim() || FALLBACK_RESPONSE.reply, recommendedDestinationIds: [] };
+  const cleaned = text.trim().replace(/^```json\s*/i, '').replace(/```$/i, '').trim();
+  const candidates = [cleaned, extractJsonCandidate(cleaned)]
+    .filter((candidate, index, all): candidate is string => Boolean(candidate) && all.indexOf(candidate) === index);
+
+  for (const candidate of candidates) {
+    try {
+      const parsed = JSON.parse(candidate) as { reply?: unknown; recommendedDestinationIds?: unknown };
+      const reply = typeof parsed.reply === 'string' && parsed.reply.trim()
+        ? parsed.reply.trim()
+        : FALLBACK_RESPONSE.reply;
+      const ids: string[] = Array.isArray(parsed.recommendedDestinationIds)
+        ? parsed.recommendedDestinationIds.filter((id: unknown) => typeof id === 'string' && validIds.has(id))
+        : [];
+      return { reply, recommendedDestinationIds: ids.slice(0, MAX_RECOMMENDATIONS) };
+    } catch {
+      // Try the next candidate before falling back to a readable response.
+    }
   }
+
+  // A response can be cut off before the closing JSON brace. Keep the readable
+  // reply instead of exposing the transport wrapper in the chat bubble.
+  const replyMatch = cleaned.match(/"reply"\s*:\s*"((?:\\.|[^"\\])*)/s);
+  if (replyMatch?.[1]) {
+    try {
+      return {
+        reply: JSON.parse(`"${replyMatch[1]}"`),
+        recommendedDestinationIds: [],
+      };
+    } catch {
+      return {
+        reply: replyMatch[1].replace(/\\n/g, '\n').replace(/\\"/g, '"').replace(/\\\\/g, '\\').trim(),
+        recommendedDestinationIds: [],
+      };
+    }
+  }
+
+  console.warn('[aiGuideService] failed to parse AI JSON, showing raw text:', text);
+  return { reply: text.trim() || FALLBACK_RESPONSE.reply, recommendedDestinationIds: [] };
 }
 
 export interface NearbyAttraction { name: string; distance: string; icon?: string; }
@@ -381,9 +455,17 @@ export function parseItineraryResponse(raw: string | null | undefined): Itinerar
 
   for (const candidate of candidates) {
     try {
-      const parsed = JSON.parse(candidate);
+      let parsed: unknown = JSON.parse(candidate);
+      for (let depth = 0; depth < 2; depth += 1) {
+        if (!parsed || typeof parsed !== 'object' || typeof (parsed as Record<string, unknown>).reply !== 'string') break;
+        try {
+          parsed = JSON.parse((parsed as Record<string, string>).reply);
+        } catch {
+          break;
+        }
+      }
       if (Array.isArray(parsed)) {
-        return parsed as ItineraryDay[];
+        return normalizeItineraryDays(parsed);
       }
       if (parsed && typeof parsed === 'object') {
         const container = parsed as Record<string, unknown>;
@@ -395,7 +477,7 @@ export function parseItineraryResponse(raw: string | null | undefined): Itinerar
               ? container.data
               : [];
         if (nested.length > 0) {
-          return nested as ItineraryDay[];
+          return normalizeItineraryDays(nested);
         }
       }
     } catch {
@@ -407,13 +489,83 @@ export function parseItineraryResponse(raw: string | null | undefined): Itinerar
   if (looseMatch) {
     try {
       const parsed = JSON.parse(looseMatch[0]);
-      if (Array.isArray(parsed)) return parsed as ItineraryDay[];
+      if (Array.isArray(parsed)) return normalizeItineraryDays(parsed);
     } catch {
       // ignore and fall through
     }
   }
 
   return [];
+}
+
+function normalizeItineraryDays(value: unknown[]): ItineraryDay[] {
+  return value.map((day, index) => {
+    const item = (day && typeof day === 'object' ? day : {}) as Record<string, unknown>;
+    const rawSlots = Array.isArray(item.slots)
+      ? item.slots
+      : Array.isArray(item.activities)
+        ? item.activities
+        : [];
+
+    return {
+      day: Number(item.day) || index + 1,
+      theme: typeof item.theme === 'string' ? item.theme : '',
+      slots: rawSlots.map((slot, slotIndex) => {
+        if (typeof slot === 'string') {
+          return { time: '', activity: slot };
+        }
+        const entry = (slot && typeof slot === 'object' ? slot : {}) as Record<string, unknown>;
+        return {
+          time: typeof entry.time === 'string' ? entry.time : `Activity ${slotIndex + 1}`,
+          activity: typeof entry.activity === 'string'
+            ? entry.activity
+            : typeof entry.description === 'string'
+              ? entry.description
+              : '',
+          tip: typeof entry.tip === 'string' ? entry.tip : undefined,
+        };
+      }).filter(slot => slot.activity.trim()),
+    };
+  }).filter(day => day.slots.length > 0);
+}
+
+function buildFallbackItinerary(dest: Destination): ItineraryDay[] {
+  const data = dest as any;
+  const name = dest.name || data.title || 'this destination';
+  const description = dest.description || data.description || data.desc || '';
+  const nearby = Array.isArray(data.nearbyAttractions) ? data.nearbyAttractions : [];
+  const hours = data.hours || data.openingHours || '';
+  const admission = data.admission || data.entranceFee || '';
+
+  const slots: ItinerarySlot[] = [
+    {
+      time: '9:00 AM',
+      activity: `Arrive at ${name} and take time to look around the main grounds.`,
+      tip: hours ? `Check the destination hours before leaving: ${hours}.` : undefined,
+    },
+    {
+      time: '10:30 AM',
+      activity: description
+        ? `Explore ${name} and learn more about it: ${description}`
+        : `Explore ${name}, take photos, and enjoy the site's main features.`,
+      tip: admission ? `Admission information: ${admission}.` : undefined,
+    },
+  ];
+
+  if (nearby[0]?.name) {
+    slots.push({
+      time: '12:00 PM',
+      activity: `Continue to the nearby attraction ${nearby[0].name}.`,
+      tip: nearby[0].distance ? `It is listed as ${nearby[0].distance} away.` : undefined,
+    });
+  } else {
+    slots.push({
+      time: '12:00 PM',
+      activity: `Take a break nearby and plan the next part of your Pasig City visit.`,
+    });
+  }
+
+  return [{ day: 1, theme: `A visit to ${name}`, slots }];
 }
 
 export async function generateDestinationItinerary(dest: Destination): Promise<ItineraryDay[]> {
@@ -460,21 +612,27 @@ Respond ONLY with a valid JSON array, no markdown, no code fences.`;
 
   const userPrompt = `Create an itinerary for:\n${contextParts.join('\n')}\nRequested at: ${localDate} ${localTime}`;
 
-  const result = await callGroqChat({
-    messages: [
-      { role: 'system', content: systemPrompt },
-      { role: 'user', content: userPrompt },
-    ],
-    temperature: 0.7,
-    max_tokens: 1200,
-    top_p: 0.9,
-  });
+  let raw = '[]';
+  try {
+    const result = await callGroqChat({
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt },
+      ],
+      temperature: 0.7,
+      max_tokens: 1200,
+      top_p: 0.9,
+    });
+    raw = result.data.reply?.trim() || '[]';
+  } catch (err) {
+    console.warn('[aiGuideService] itinerary generation fell back:', err);
+    return buildFallbackItinerary(dest);
+  }
 
-  const raw = result.data.reply?.trim() || '[]';
   const parsed = parseItineraryResponse(raw);
   if (parsed.length > 0) return parsed;
 
-  return [];
+  return buildFallbackItinerary(dest);
 }
 
 export async function askAIGuide(params: AskAIGuideParams): Promise<AIGuideResponse> {
@@ -502,14 +660,17 @@ export async function askAIGuide(params: AskAIGuideParams): Promise<AIGuideRespo
   }
 
   let showRouteToId: string | undefined;
-  if (DIRECTIONS_INTENT.test(message)) {
-    if (!coords) {
-      contextLines.push('The tourist asked for directions, but their location is not available — ask them to enable location instead of guessing a distance.');
-    } else {
-      const candidate = findDestinationForQuestion(message, ranked);
-      const candidateCoords = candidate ? getCoords(candidate) : null;
+  if (DIRECTIONS_INTENT.test(message) || FOLLOWUP_ROUTE_INTENT.test(message) || MAP_INTENT.test(message)) {
+    const isMapRequest = MAP_INTENT.test(message);
+    const candidate = findDestinationForQuestion(message, ranked, history);
+    const candidateCoords = candidate ? getCoords(candidate) : null;
 
-      if (candidate && candidateCoords) {
+    if (!coords && !isMapRequest) {
+      contextLines.push('The tourist asked for directions, but their location is not available — ask them to enable location instead of guessing a distance.');
+    } else if (candidate && candidateCoords) {
+      // The destination map is useful even when the walking-route provider is unavailable.
+      showRouteToId = candidate.id;
+      if (coords) {
         try {
           const route = await getWalkingRoute(
             { lat: coords.latitude, lng: coords.longitude },
@@ -517,13 +678,16 @@ export async function askAIGuide(params: AskAIGuideParams): Promise<AIGuideRespo
           );
           const placeName = (candidate as any).title || (candidate as any).name || 'that place';
           contextLines.push(describeRouteForPrompt(route, placeName));
-          showRouteToId = candidate.id;
         } catch (err) {
           console.warn('[aiGuideService] direction lookup failed:', err);
+          contextLines.push('Show the destination on a map, but do not claim a route, distance, or ETA because live route details are unavailable.');
         }
       } else {
-        contextLines.push('The tourist asked for directions but did not identify a destination. Ask one short clarifying question; do not choose a place or show a route.');
+        contextLines.push('Show the destination on a map, but do not claim a route, distance, or ETA because the tourist location is unavailable.');
+        showRouteToId = candidate.id;
       }
+    } else {
+      contextLines.push('The tourist asked for directions or a map but did not identify a destination. Ask one short clarifying question; do not choose a place or show a route.');
     }
   }
 
@@ -563,7 +727,9 @@ export async function askAIGuide(params: AskAIGuideParams): Promise<AIGuideRespo
     if (!text) return FALLBACK_RESPONSE;
 
     const parsed = safeParseAIGuideJSON(text, ranked);
-    return showRouteToId ? { ...parsed, showRouteToId } : parsed;
+    const requestedIds = getRequestedRecommendationIds(message, ranked);
+    const response = requestedIds ? { ...parsed, recommendedDestinationIds: requestedIds } : parsed;
+    return showRouteToId ? { ...response, showRouteToId } : response;
   } catch (err) {
     console.error('[aiGuideService] askAIGuide failed:', err);
     return FALLBACK_RESPONSE;

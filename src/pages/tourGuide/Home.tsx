@@ -38,8 +38,12 @@ const Home: React.FC = () => {
       try {
         let name = '';
         let avatar = '';
+        const [userSnap, guideSnap] = await Promise.all([
+          getDoc(doc(firestore, 'users', currentUser.uid)),
+          getDoc(doc(firestore, 'tourGuides', currentUser.uid)),
+        ]);
+
         // 1. Try users collection
-        const userSnap = await getDoc(doc(firestore, 'users', currentUser.uid));
         if (userSnap.exists()) {
           const data = userSnap.data();
           const first = data?.name?.firstname || '';
@@ -50,7 +54,6 @@ const Home: React.FC = () => {
 
         // 2. Fallback to tourGuides
         if (!name || !avatar) {
-          const guideSnap = await getDoc(doc(firestore, 'tourGuides', currentUser.uid));
           if (guideSnap.exists()) {
             const data = guideSnap.data();
             if (!name) {

@@ -55,8 +55,6 @@ import { functions } from '../firebase';
 // now persisted in localStorage instead of in-memory — so it survives an
 // app reload instead of resetting every time the app restarts.
 
-const GROQ_MODEL = 'llama-3.3-70b-versatile';
-
 interface GroqChatMessage {
   role: 'system' | 'user' | 'assistant';
   content: string;
@@ -267,9 +265,9 @@ export const ProximityAIProvider: React.FC<{ children: React.ReactNode }> = ({ c
   const [destination, setDestination]     = useState<ProximityDestination | null>(null);
   const [narration, setNarration]         = useState('');
   const [isGenericMode, setGenericMode]   = useState(false);
-  const [geofenceLoaded, setGeofenceLoaded] = useState(false);
   const [isListening, setListening]       = useState(false); // NEW
   const [liveTranscript, setLiveTranscript] = useState('');   // NEW
+  const [geofenceReady, setGeofenceReady] = useState(false);
 
   // Raw GeofenceDestination[] — kept in the richer shape proximityAIService's
   // findArrival/generateArrivalNarration/logProximityTrigger all expect
@@ -297,7 +295,7 @@ export const ProximityAIProvider: React.FC<{ children: React.ReactNode }> = ({ c
         const data = await getGeofenceDestinations();
         if (!cancelled) {
           geofenceRef.current = data;
-          setGeofenceLoaded(true);
+          setGeofenceReady(true);
         }
       } catch (err) {
         console.error('ProximityAI: failed to load destinations', err);
@@ -396,7 +394,7 @@ export const ProximityAIProvider: React.FC<{ children: React.ReactNode }> = ({ c
       stopTTS();
     };
     // triggerFor is stable across the component's life (its own deps are stable refs/callbacks)
-  }, [triggerFor, stopTTS, uid, geofenceLoaded]);
+  }, [geofenceReady, triggerFor, stopTTS, uid]);
 
   // ── Public actions ───────────────────────────────────────────────────────
 
@@ -468,7 +466,6 @@ export const ProximityAIProvider: React.FC<{ children: React.ReactNode }> = ({ c
           { role: 'system', content: dest ? buildQASystemPrompt(dest) : buildGenericQASystemPrompt() },
           ...conversationRef.current.slice(-6),
         ],
-        model: GROQ_MODEL,
         temperature: 0.7,
         max_tokens: 180,
         top_p: 0.9,

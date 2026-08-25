@@ -147,6 +147,18 @@ ion-input input[type="password"]::-ms-clear {
   text-decoration:none; 
 }
 
+.login-status {
+  min-height: 16px;
+  margin-top: -6px;
+  color: #6b7280;
+  font-size: 12px;
+  text-align: center;
+}
+
+.login-status--error {
+  color: #dc2626;
+}
+
 .google-button{
   display:flex;
   align-items:center;

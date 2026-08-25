@@ -90,7 +90,7 @@ const resolveHomeRoute = async (uid: string): Promise<RouteResult> => {
 
 const Login: React.FC = () => {
   const history = useHistory();
-  const { isAuthenticated } = useAuth();
+  const { currentUser, isAuthenticated, authLoading } = useAuth();
   const { updateSignupData } = useSignup();
   const navigationInProgressRef = useRef(false);
 
@@ -102,15 +102,25 @@ const Login: React.FC = () => {
   const [alertMessage, setAlertMessage] = useState('');
   const [alertHeader,  setAlertHeader]  = useState('');
   const [checkingGoogleRedirect, setCheckingGoogleRedirect] = useState(true);
+  const [loginAttempts, setLoginAttempts] = useState(0);
+  const [loginLocked, setLoginLocked] = useState(false);
+  const [loginCountdown, setLoginCountdown] = useState(0);
+  const loginLockTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const loginCountdownTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const maxLoginAttempts = 5;
+
+  useEffect(() => () => {
+    if (loginLockTimerRef.current) clearTimeout(loginLockTimerRef.current);
+    if (loginCountdownTimerRef.current) clearInterval(loginCountdownTimerRef.current);
+  }, []);
 
   // ── Redirect if already logged in ──────────────────────────────────────────
   // Must check role — tourguides go to /tourguide/home, not /home
   useEffect(() => {
-    if (!isAuthenticated || checkingGoogleRedirect || navigationInProgressRef.current) return;
-    const { currentUser } = auth;
-    if (!currentUser) { history.replace('/home'); return; }
+    if (authLoading || !isAuthenticated || !currentUser || checkingGoogleRedirect
+      || navigationInProgressRef.current) return;
     handlePostAuth(currentUser.uid);
-  }, [isAuthenticated, history, checkingGoogleRedirect]);
+  }, [authLoading, currentUser, isAuthenticated, history, checkingGoogleRedirect]);
 
   // ── Helpers ─────────────────────────────────────────────────────────────────
   const isValidEmail = (value: string) =>
@@ -182,6 +192,10 @@ const Login: React.FC = () => {
 
   // ── Email / Password Login ──────────────────────────────────────────────────
   const handleLogin = async () => {
+    if (loginLocked) {
+      return showError('Login Temporarily Locked', 'Too many failed attempts. Please try again in 30 seconds.');
+    }
+
     if (!email.trim() && !password)
       return showError('Missing Fields', 'Please enter your email address and password.');
     if (!email.trim())
@@ -196,6 +210,8 @@ const Login: React.FC = () => {
     setShowLoading(true);
     try {
       const { user } = await signInWithEmailAndPassword(auth, email.trim(), password);
+      setLoginAttempts(0);
+      setLoginCountdown(0);
       await handlePostAuth(user.uid);
     } catch (error: any) {
       let message: string;
@@ -218,6 +234,28 @@ const Login: React.FC = () => {
           message = 'Email/password login is not enabled. Please contact support.'; break;
         default:
           message = error.message || 'An unexpected error occurred. Please try again later.';
+      }
+      if (['auth/user-not-found', 'auth/wrong-password', 'auth/invalid-credential'].includes(error.code)) {
+        const nextAttempts = loginAttempts + 1;
+        setLoginAttempts(nextAttempts);
+        if (nextAttempts >= maxLoginAttempts) {
+          setLoginLocked(true);
+          setLoginCountdown(30);
+          if (loginLockTimerRef.current) clearTimeout(loginLockTimerRef.current);
+          if (loginCountdownTimerRef.current) clearInterval(loginCountdownTimerRef.current);
+          loginCountdownTimerRef.current = setInterval(() => {
+            setLoginCountdown(previous => Math.max(previous - 1, 0));
+          }, 1_000);
+          loginLockTimerRef.current = setTimeout(() => {
+            setLoginAttempts(0);
+            setLoginLocked(false);
+            setLoginCountdown(0);
+            if (loginCountdownTimerRef.current) clearInterval(loginCountdownTimerRef.current);
+            loginLockTimerRef.current = null;
+            loginCountdownTimerRef.current = null;
+          }, 30_000);
+          message = 'Too many failed login attempts. Please try again in 30 seconds.';
+        }
       }
       showError('Login Failed', message);
     } finally {
@@ -297,7 +335,7 @@ const Login: React.FC = () => {
         <div className="logo-wrap">
           <img src="/assets/images/Pasig Logo.png" alt="Pasig Logo" className="logo" />
         </div>
-        <h2 className="title">Catour</h2>
+        <h2 className="title">CATOUR</h2>
         <p className="subtitle">DISCOVER THE PASIG WITH AI GUIDANCE!</p>
 
         <div className="login-card">
@@ -335,9 +373,14 @@ const Login: React.FC = () => {
               />
             </IonItem>
 
-            <IonButton expand="block" className="login-button" onClick={handleLogin}>
-              Log In
+            <IonButton expand="block" className="login-button" onClick={handleLogin} disabled={showLoading || loginLocked}>
+              {loginLocked ? `` : 'Log In'}
             </IonButton>
+
+            <div className={`login-status${loginLocked ? ' login-status--error' : ''}`} aria-live="polite">
+              {showLoading && 'Login...'}
+              {!showLoading && loginLocked && `Login incorrect. Try again in ${loginCountdown} seconds.`}
+            </div>
 
             <div className="forgot">
               <Link to="/reset-password">Forgot password?</Link>

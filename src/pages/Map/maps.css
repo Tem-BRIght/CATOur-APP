@@ -16,6 +16,7 @@
   inset: 0;
   width: 100%;
   height: 100%;
+  touch-action: none;
   background: #e8e0d8;
   z-index: 0;
 }
@@ -238,6 +239,8 @@
   font-size: 12px;
   color: #64748B;
   margin-top: 2px;
+  flex: 1;
+  min-width: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -327,6 +330,25 @@
 }
 
 .map-error { color: #e53935; }
+
+.map-load-error {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  background: rgba(255, 255, 255, 0.94);
+  color: #334155;
+}
+
+.map-load-error button {
+  border: 0;
+  border-radius: 8px;
+  padding: 10px 16px;
+  background: #0f766e;
+  color: #fff;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
 
 /* ─────────────────────────────────────────────────────────
    Selected Destination Bottom Card

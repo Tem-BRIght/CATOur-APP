@@ -119,19 +119,46 @@
 }
 
 .header-col-id {
-  width: 15%;
+  width: 8%;
   text-align: center;
 }
 
 .header-col-name {
-  width: 40%;
+  width: 26%;
   padding-left: 0.5rem;
 }
 
+.header-col-gender,
+.header-col-nationality,
+.header-col-religion {
+  width: 16%;
+  padding-left: 0.5rem;
+  font-size: 0.83rem;
+}
+
 .header-col-email {
-  width: 45%;
+  width: 18%;
   padding-left: 0.5rem;
 }
+
+.header-col-feedback {
+  width: 14%;
+  padding-left: 0.5rem;
+}
+
+.tourist-table-header--completed .header-col-id,
+.tourist-page-row--completed .row-col-id { width: 6%; }
+.tourist-table-header--completed .header-col-name,
+.tourist-page-row--completed .row-col-name { width: 22%; }
+.tourist-table-header--completed .header-col-gender,
+.tourist-table-header--completed .header-col-nationality,
+.tourist-table-header--completed .header-col-religion,
+.tourist-page-row--completed .row-col-gender,
+.tourist-page-row--completed .row-col-nationality,
+.tourist-page-row--completed .row-col-religion { width: 12%; }
+.tourist-table-header--completed .header-col-email,
+.tourist-page-row--completed .row-col-email { width: 10%; }
+.tourist-page-row--completed .row-col-feedback { width: 14%; }
 
 .tourist-page-list {
   background: transparent;
@@ -152,7 +179,7 @@
 }
 
 .row-col-id {
-  width: 15%;
+  width: 8%;
   text-align: center;
   color: #1a8fe3;
   font-weight: 700;
@@ -160,11 +187,23 @@
 }
 
 .row-col-name {
-  width: 40%;
+  width: 26%;
   padding-left: 0.5rem;
   display: flex;
   align-items: center;
   gap: 0.75rem;
+}
+
+.row-col-gender,
+.row-col-nationality,
+.row-col-religion {
+  width: 16%;
+  padding-left: 0.5rem;
+  color: #334155;
+  font-size: 0.82rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .tourist-avatar {
@@ -184,14 +223,23 @@
 }
 
 .row-col-email {
-  width: 45%;
+  width: 18%;
   padding-left: 0.5rem;
   color: #5a6a7a;
-  font-size: 0.88rem;
+  font-size: 0.82rem;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+.row-col-feedback {
+  padding-left: 0.5rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.feedback-reviewed { color: #2e7d32; }
+.feedback-pending { color: #e65100; }
 
 /* ── No Results ── */
 .no-results {

@@ -55,13 +55,36 @@ const formatTime = (t: string) => {
   return `${h12}:${String(m).padStart(2, '0')} ${ampm}`;
 };
 
+const getLocalDateKey = (date = new Date()) => {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+};
+
+const parseDateOnly = (dateValue: string) => {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateValue);
+  if (match) {
+    return new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+  }
+  return new Date(dateValue);
+};
+
 const formatDate = (iso: string) => {
-  const d = new Date(iso);
+  const d = parseDateOnly(iso);
   return d.toLocaleDateString('en-US', {
     weekday: 'long',
     month: 'long',
     day: 'numeric',
   });
+};
+
+const formatSessionDuration = (session: TourSession) => {
+  const start = new Date(session.startTime).getTime();
+  const end = session.endTime ? new Date(session.endTime).getTime() : Date.now();
+  const totalMinutes = Math.max(0, Math.floor((end - start) / 60000));
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  return hours > 0
+    ? `${hours} hr${minutes ? ` ${minutes} min` : ''}`
+    : `${minutes} min`;
 };
 
 /**
@@ -86,6 +109,7 @@ const isSlotTimeExpired = (dateStr: string, startTime: string): boolean => {
 export interface MergedSlot {
   guideId: string;
   guideName: string;
+  guidePhotoUrl?: string;
   rawIndex: number;
   date: string;
   startTime: string;
@@ -102,6 +126,7 @@ export const getLatestTodaySlots = (type: TourTypeWithSchedules): MergedSlot[] =
       merged.push({
         guideId: guide.guideId,
         guideName: guide.guideName,
+        guidePhotoUrl: guide.guidePhotoUrl,
         rawIndex: slot.rawIndex,
         date: slot.date,
         startTime: slot.startTime,
@@ -113,17 +138,10 @@ export const getLatestTodaySlots = (type: TourTypeWithSchedules): MergedSlot[] =
     });
   });
 
-  if (merged.length === 0) return [];
-
-  const sorted = merged.sort((a, b) => a.startTime.localeCompare(b.startTime));
-  const latestStartMs = Math.max(
-    ...sorted.map((slot) => new Date(`${slot.date}T${slot.startTime}:00`).getTime())
-  );
-
-  return sorted.filter((slot) => {
-    const slotStartMs = new Date(`${slot.date}T${slot.startTime}:00`).getTime();
-    return slotStartMs === latestStartMs;
-  });
+  const today = getLocalDateKey();
+  return merged
+    .filter((slot) => slot.date === today)
+    .sort((a, b) => a.startTime.localeCompare(b.startTime));
 };
 
 const getMergedSlots = (type: TourTypeWithSchedules): MergedSlot[] => getLatestTodaySlots(type);
@@ -425,14 +443,17 @@ const TourPage: React.FC = () => {
 
             {!historyLoading && joinedSessions.length > 0 && (
               <div className="history-timeline">
-                {joinedSessions
-                  .filter((s) => s.status !== 'Cancelled')
-                  .map((s, index) => {
+                {joinedSessions.map((s, index) => {
+                    const isCancelled = s.status === 'Cancelled';
                     const isEnded = s.status === 'ended';
                     const isActive = s.status === 'active';
-                    const dotClass = isEnded ? 'ht-dot--completed' : 'ht-dot--confirmed';
-                    const pillClass = isEnded ? 'ht-status-pill--completed' : 'ht-status-pill--confirmed';
-                    const pillLabel = isEnded ? 'Completed' : isActive ? 'Ongoing' : 'Joined';
+                    const dotClass = isCancelled
+                      ? 'ht-dot--cancelled'
+                      : isEnded ? 'ht-dot--completed' : 'ht-dot--confirmed';
+                    const pillClass = isCancelled
+                      ? 'ht-status-pill--cancelled'
+                      : isEnded ? 'ht-status-pill--completed' : 'ht-status-pill--confirmed';
+                    const pillLabel = isCancelled ? 'Cancelled' : isEnded ? 'Completed' : isActive ? 'Ongoing' : 'Joined';
                     const isLast = index === joinedSessions.length - 1;
 
                   return (
@@ -452,16 +473,23 @@ const TourPage: React.FC = () => {
                           <span className={`ht-status-pill ${pillClass}`}>{pillLabel}</span>
                         </div>
 
-                        {/* Tap to reopen the same tour session view the
-                            tourist would land on by scanning the QR again. */}
+                        {s.status === 'Cancelled' && (
+                          <p style={{ margin: '10px 0 0', color: '#b91c1c', fontSize: '12px', lineHeight: 1.5 }}>
+                            <IonIcon icon={closeOutline} /> Reason: {s.cancelReason || 'No reason provided'}
+                          </p>
+                        )}
+
+                        {/* Tap to reopen the same tour session view the tourist
+                          would land on by scanning the QR again. */}
                         <div
                           className="ht-dest-row"
                           onClick={() => router.push(`/tour-session/${s.id}`, 'forward')}
                         >
                           <div className="ht-dest-info">
-                            <div className="ht-dest-name">{s.destinationName || 'Untitled tour'}</div>
+                            <div className="ht-field-label">Type of Tour</div>
+                            <div className="ht-dest-name">{s.tourTypeName || 'Tour'}</div>
                             <div className="ht-tour-type-tag">
-                              <IonIcon icon={walkOutline} /> {s.tourTypeName || 'Tour'}
+                              <IonIcon icon={timeOutline} /> Duration: {formatSessionDuration(s)}
                             </div>
                           </div>
                           <IonIcon icon={arrowForwardOutline} className="ht-arrow" />
@@ -470,7 +498,7 @@ const TourPage: React.FC = () => {
                         <div className="ht-meta-row">
                           <span className="ht-guide-chip">
                             <span className="ht-guide-avatar">
-                              <IonIcon icon={personOutline} />
+                              {s.guidePhotoUrl ? <img src={s.guidePhotoUrl} alt="" /> : <IonIcon icon={personOutline} />}
                             </span>
                             <span className="ht-guide-name">{s.guideName}</span>
                           </span>
@@ -486,17 +514,19 @@ const TourPage: React.FC = () => {
                         </div>
 
                         <div className="ht-actions">
-                          <IonButton
-                            fill="clear"
-                            size="small"
-                            className="ht-action-btn"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              router.push(`/tour-session/${s.id}`, 'forward');
-                            }}
-                          >
-                            View Session
-                          </IonButton>
+                          {!isEnded && (
+                            <IonButton
+                              fill="clear"
+                              size="small"
+                              className="ht-action-btn"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                router.push(`/tour-session/${s.id}`, 'forward');
+                              }}
+                            >
+                              View Session
+                            </IonButton>
+                          )}
                           {isEnded && (
                             <IonButton
                               fill="clear"
@@ -532,11 +562,7 @@ const TourPage: React.FC = () => {
                 <div>
                   <p className="slots-modal-eyebrow">Available slots</p>
                   <h3 className="slots-modal-title">{activeType.name}</h3>
-                  {activeSlots[0] && (
-                    <p className="slots-modal-date">
-                      Today · {formatDate(activeSlots[0].date)}
-                    </p>
-                  )}
+                  <p className="slots-modal-date">Today · {formatDate(getLocalDateKey())}</p>
                 </div>
                 <button
                   className="slots-modal-close"
@@ -586,10 +612,14 @@ const TourPage: React.FC = () => {
                       ].join(' ').trim()}
                     >
                       <div className="slot-row-info">
-                        <span className="slot-row-time">{formatTime(slot.startTime)}</span>
+                        <span className="slot-row-time">{formatTime(slot.startTime)} - {formatTime(slot.endTime)}</span>
                         <span className="slot-row-guide">
-                          <IonIcon icon={personOutline} /> {slot.guideName}
+                          <span className="slot-row-guide-avatar">
+                            {slot.guidePhotoUrl ? <img src={slot.guidePhotoUrl} alt="" /> : <IonIcon icon={personOutline} />}
+                          </span>
+                          {slot.guideName}
                         </span>
+                        <span className="slot-row-duration">{formatSessionDuration({ startTime: `${slot.date}T${slot.startTime}:00`, endTime: `${slot.date}T${slot.endTime}:00` } as TourSession)}</span>
                         <span
                           className={[
                             'slot-row-status',
@@ -666,10 +696,14 @@ const TourPage: React.FC = () => {
                               ].join(' ').trim()}
                             >
                               <div className="slot-row-info">
-                                <span className="slot-row-time">{formatTime(slot.startTime)}</span>
+                                <span className="slot-row-time">{formatTime(slot.startTime)} - {formatTime(slot.endTime)}</span>
                                 <span className="slot-row-guide">
-                                  <IonIcon icon={personOutline} /> {slot.guideName}
+                                  <span className="slot-row-guide-avatar">
+                                    {slot.guidePhotoUrl ? <img src={slot.guidePhotoUrl} alt="" /> : <IonIcon icon={personOutline} />}
+                                  </span>
+                                  {slot.guideName}
                                 </span>
+                                <span className="slot-row-duration">{formatSessionDuration({ startTime: `${group.date}T${slot.startTime}:00`, endTime: `${group.date}T${slot.endTime}:00` } as TourSession)}</span>
                                 <span
                                   className={[
                                     'slot-row-status',

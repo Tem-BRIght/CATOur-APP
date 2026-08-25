@@ -50,7 +50,11 @@ service cloud.firestore {
 
     match /tourGuides/{uid} {
       allow read: if isSignedIn();
-      allow create, update: if isOwner(uid) || isAdmin();
+      allow create: if isOwner(uid) || isAdmin();
+      allow update: if isOwner(uid) || isAdmin() || (
+        isSignedIn() &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['availabilitySlots'])
+      );
       allow delete: if isAdmin();
     }
 
@@ -101,16 +105,30 @@ service cloud.firestore {
     match /sessions/{id} {
       allow read: if isSignedIn();
       allow create: if isAdmin() || (
-        isSignedIn() && request.resource.data.guideId == request.auth.uid
+        isSignedIn() && (
+          request.resource.data.guideId == request.auth.uid ||
+          (
+            request.resource.data.guideId is string &&
+            exists(/databases/$(database)/documents/tourGuides/$(request.resource.data.guideId)) &&
+            request.resource.data.touristUids is list &&
+            request.resource.data.touristUids.hasAny([request.auth.uid]) &&
+            request.resource.data.tourists is list
+          )
+        )
       );
       allow update: if isAdmin() || (
         isSignedIn() && resource.data.guideId == request.auth.uid &&
         request.resource.data.guideId == request.auth.uid
       ) || (
-        isSessionParticipant(resource.data) &&
+        isSignedIn() &&
         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['tourists', 'touristUids']) &&
+        resource.data.touristUids is list &&
         request.resource.data.touristUids is list &&
-        request.resource.data.tourists is list
+        request.resource.data.tourists is list &&
+        request.resource.data.touristUids.hasAll(resource.data.touristUids) &&
+        request.resource.data.touristUids.hasAny([request.auth.uid]) &&
+        request.resource.data.touristUids.size() == resource.data.touristUids.size() + 1 &&
+        request.resource.data.tourists.size() == resource.data.tourists.size() + 1
       );
       allow delete: if isSignedIn() && (resource.data.guideId == request.auth.uid || isAdmin());
     }

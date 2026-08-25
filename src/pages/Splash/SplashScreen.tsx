@@ -19,8 +19,7 @@ const SplashScreen: React.FC = () => {
         ? (mustChangePassword ? '/tourguide/change-password' : '/tourguide/home')
         : '/home';
 
-    const timer = window.setTimeout(() => history.replace(destination), 2800);
-    return () => window.clearTimeout(timer);
+    history.replace(destination);
   }, [authLoading, history, isAuthenticated, mustChangePassword, role]);
 
   return (

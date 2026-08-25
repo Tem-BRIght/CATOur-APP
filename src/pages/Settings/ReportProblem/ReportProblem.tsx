@@ -29,9 +29,10 @@ import {
   cameraOutline,
   checkmarkCircleOutline,
 } from 'ionicons/icons';
-import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
+import { collection, doc, serverTimestamp, setDoc } from 'firebase/firestore';
+import { getDownloadURL, ref as storageRef, uploadBytes } from 'firebase/storage';
 import { useAuth } from '../../../context/AuthContext';
-import { firestore } from '../../../firebase';
+import { firestore, storage } from '../../../firebase';
 
 import './ReportProblem.css';
 
@@ -51,6 +52,7 @@ const ReportProblem: React.FC = () => {
   const [severity, setSeverity]     = useState<Severity>('');
   const [subject,  setSubject]      = useState('');
   const [details,  setDetails]      = useState('');
+  const [attachment, setAttachment] = useState<File | null>(null);
   const [preview,  setPreview]      = useState<string | null>(null);
   const [showToast, setShowToast]   = useState(false);
   const [toastMsg,  setToastMsg]    = useState('');
@@ -61,6 +63,7 @@ const ReportProblem: React.FC = () => {
     const file = e.target.files?.[0];
     if (!file) return;
     e.target.value = '';
+    setAttachment(file);
     const reader = new FileReader();
     reader.onload = () => setPreview(reader.result as string);
     reader.readAsDataURL(file);
@@ -87,13 +90,23 @@ const ReportProblem: React.FC = () => {
 
   const submitReport = async () => {
     try {
-      await addDoc(collection(firestore, 'problemReports'), {
+      const reportRef = doc(collection(firestore, 'problemReports'));
+      let screenshotUrl: string | null = null;
+
+      if (attachment) {
+        const imageRef = storageRef(storage, `profilePictures/${user?.uid}/problemReports/${reportRef.id}/screenshot`);
+        await uploadBytes(imageRef, attachment, { contentType: attachment.type });
+        screenshotUrl = await getDownloadURL(imageRef);
+      }
+
+      await setDoc(reportRef, {
         category,
         severity: severity || 'Medium',
         subject: subject.trim(),
         details: details.trim(),
         message: details.trim(),
-        screenshotAttached: !!preview,
+        screenshotAttached: !!screenshotUrl,
+        screenshotUrl,
         userId: user?.uid || null,
         userEmail: user?.email || null,
         userName: user?.displayName || user?.email?.split('@')[0] || 'Tourist',
@@ -106,6 +119,7 @@ const ReportProblem: React.FC = () => {
       setSeverity('');
       setSubject('');
       setDetails('');
+      setAttachment(null);
       setPreview(null);
       setShowConfirm(false);
     } catch (err) {
@@ -213,7 +227,7 @@ const ReportProblem: React.FC = () => {
         {preview && (
           <div className="attach-preview">
             <img src={preview} alt="Screenshot preview" />
-            <button className="attach-remove" onClick={() => setPreview(null)}>
+            <button className="attach-remove" onClick={() => { setAttachment(null); setPreview(null); }}>
               <IonIcon icon={closeOutline} />
             </button>
           </div>

@@ -54,6 +54,12 @@
   text-shadow: 0 2px 8px rgba(0,0,0,0.15);
 }
 
+.ts-destination {
+  margin: 0 0 0.45rem;
+  font-size: 0.9rem;
+  opacity: 0.82;
+}
+
 .ts-guide {
   font-size: 1rem;
   opacity: 0.9;

@@ -64,6 +64,21 @@ const SignUP3: React.FC = () => {
     }
   };
 
+  const ageValidationLabel = (() => {
+    if (!dateOfBirth) return '';
+    const dob = new Date(dateOfBirth);
+    const today = new Date();
+    let calculatedAge = today.getFullYear() - dob.getFullYear();
+    const monthDifference = today.getMonth() - dob.getMonth();
+    if (monthDifference < 0 || (monthDifference === 0 && today.getDate() < dob.getDate())) calculatedAge--;
+    if (Number.isNaN(dob.getTime()) || dob > today) return 'Enter a valid date of birth.';
+    if (calculatedAge < 10) return 'You must be at least 10 years old.';
+    return `Age: ${calculatedAge} years old`;
+  })();
+
+  const ageValidationError = ageValidationLabel === 'Enter a valid date of birth.' ||
+    ageValidationLabel === 'You must be at least 10 years old.';
+
   // ── Photo picker ──────────────────────────────────────────────────────────
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -112,6 +127,17 @@ const SignUP3: React.FC = () => {
     if (!address.trim()) {
       setAlertHeader('Missing Address');
       setAlertMessage('Please enter your full address.');
+      setShowAlert(true);
+      return;
+    }
+    const dob = new Date(dateOfBirth);
+    const today = new Date();
+    let calculatedAge = today.getFullYear() - dob.getFullYear();
+    const monthDifference = today.getMonth() - dob.getMonth();
+    if (monthDifference < 0 || (monthDifference === 0 && today.getDate() < dob.getDate())) calculatedAge--;
+    if (Number.isNaN(dob.getTime()) || dob > today || calculatedAge < 10) {
+      setAlertHeader('Age Requirement');
+      setAlertMessage('You must be at least 10 years old to create an account.');
       setShowAlert(true);
       return;
     }
@@ -271,6 +297,9 @@ const SignUP3: React.FC = () => {
                 onIonChange={(e) => setUsername(e.detail.value!)}
                 className="text-input"
               />
+                <IonLabel className={`age-validation-label${ageValidationError ? ' age-validation-label--error' : ''}`}>
+                  {ageValidationLabel}
+                </IonLabel>
             </IonItem>
 
             {/* ── Date of Birth + Age (side-by-side) ───────────────────────── */}

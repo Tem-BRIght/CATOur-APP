@@ -10,8 +10,7 @@ import {
 import {
   ellipsisVertical, camera, person, location, mail,
   save, close, bookOutline, homeOutline, createOutline,
-  calendarOutline, peopleOutline, flagOutline, checkmarkCircle, ellipseOutline,
-  callOutline
+  calendarOutline, peopleOutline, flagOutline, checkmarkCircle, ellipseOutline
 } from 'ionicons/icons';
 import { useAuth } from '../../../context/AuthContext';
 import {
@@ -23,6 +22,7 @@ import {
   UserAddress
 } from '../../../services/userProfileService';
 import { getProfilePicCache, setProfilePicCache } from '../../../utils/profileImageStorage';
+import OtherSelect from '../../../components/OtherSelect';
 import './profile.css';
 
 
@@ -30,6 +30,17 @@ const RELIGIONS = [
   'Roman Catholic','Islam','Evangelical','Iglesia ni Cristo','Seventh-day Adventist',
   'United Church of Christ','Baptist','Other Christian','Buddhist','Hindu','Non-religious','Other',
 ];
+
+const NATIONALITIES = [
+  'Filipino','American','Japanese','Korean','Chinese',
+  'British','Australian','Canadian','Indian','Other',
+];
+
+function getSelectValue(value: string | undefined, options: string[]) {
+  if (!value) return '';
+  const matchingOption = options.find(option => option.toLowerCase() === value.toLowerCase());
+  return matchingOption && matchingOption !== 'Other' ? matchingOption : 'Other';
+}
 
 
 function formatAddress(address: UserAddress | string | undefined): string {
@@ -69,6 +80,8 @@ const Profile: React.FC = () => {
 
   // Address edit state for edit mode
   const [editAddress, setEditAddress] = useState('');
+  const [otherNationality, setOtherNationality] = useState('');
+  const [otherReligion, setOtherReligion] = useState('');
 
   // ── Real-time Firestore listener ─────────────────────────────────────────
   const subscribeToProfile = useCallback((uid: string) => {
@@ -135,8 +148,7 @@ const Profile: React.FC = () => {
   // Image upload
   const handleImageClick = () => {
     if (!isEditing && userProfile) {
-      setEditForm({ ...userProfile });
-      setIsEditing(true);
+      handleEditProfile();
       setTimeout(() => fileInputRef.current?.click(), 50);
     } else {
       fileInputRef.current?.click();
@@ -185,8 +197,19 @@ const Profile: React.FC = () => {
         ? userProfile.address.trim()
         : '';
       const initialEdit = originalString || joinedAddress;
+      const savedNationality = userProfile.nationality || '';
+      const savedReligion = userProfile.religion || '';
+      const nationalityValue = getSelectValue(savedNationality, NATIONALITIES);
+      const religionValue = getSelectValue(savedReligion, RELIGIONS);
+      setOtherNationality(nationalityValue === 'Other' ? savedNationality : '');
+      setOtherReligion(religionValue === 'Other' ? savedReligion : '');
       setEditAddress(initialEdit);
-      setEditForm({ ...userProfile, address: initialEdit });
+      setEditForm({
+        ...userProfile,
+        address: initialEdit,
+        nationality: nationalityValue === 'Other' ? 'other' : nationalityValue,
+        religion: religionValue,
+      });
       setIsEditing(true);
     }
   };
@@ -194,6 +217,8 @@ const Profile: React.FC = () => {
   const handleCancelEdit = () => {
     setIsEditing(false);
     setEditForm({});
+    setOtherNationality('');
+    setOtherReligion('');
     const addr = normalizeAddressValue(userProfile?.address as UserAddress | string | undefined);
     const joinedAddress = [addr.brgy, addr.city, addr.region].filter(Boolean).join(', ');
     setEditAddress(joinedAddress);
@@ -208,7 +233,26 @@ const Profile: React.FC = () => {
       if (!editForm.name?.firstname?.trim()) throw new Error('First name is required');
       if (!editForm.nickname?.trim())        throw new Error('Nickname is required');
 
+      if (editForm.dateOfBirth) {
+        const dob = new Date(editForm.dateOfBirth);
+        const today = new Date();
+        let calculatedAge = today.getFullYear() - dob.getFullYear();
+        const monthDifference = today.getMonth() - dob.getMonth();
+        if (monthDifference < 0 || (monthDifference === 0 && today.getDate() < dob.getDate())) calculatedAge--;
+        if (Number.isNaN(dob.getTime()) || dob > today || calculatedAge < 10) {
+          throw new Error('You must be at least 10 years old.');
+        }
+      }
+
       const nextAddress = editAddress.trim();
+      const nextNationality = editForm.nationality === 'other'
+        ? otherNationality.trim()
+        : editForm.nationality?.trim() ?? userProfile.nationality ?? '';
+      const nextReligion = editForm.religion === 'Other'
+        ? otherReligion.trim()
+        : editForm.religion ?? userProfile.religion ?? '';
+      if (!nextNationality) throw new Error('Nationality is required');
+      if (!nextReligion) throw new Error('Religion is required');
       setEditForm(prev => ({ ...prev, address: nextAddress }));
 
       const toSave: Partial<UserProfile> = {
@@ -216,10 +260,10 @@ const Profile: React.FC = () => {
         dateOfBirth: editForm.dateOfBirth ?? userProfile.dateOfBirth ?? '',
         age: editForm.age ?? userProfile.age ?? '',
         nickname: editForm.nickname?.trim() ?? userProfile.nickname ?? '',
-        nationality: editForm.nationality?.trim() ?? userProfile.nationality ?? '',
-        contactNumber: editForm.contactNumber?.trim() ?? userProfile.contactNumber ?? '',
+        nationality: nextNationality,
+        contactNumber: editForm.contactNumber ?? userProfile.contactNumber ?? '',
         gender: editForm.gender ?? userProfile.gender ?? '',
-        religion: editForm.religion ?? userProfile.religion ?? '',
+        religion: nextReligion,
         img: editForm.img ?? userProfile.img ?? null,
         name: {
           firstname: editForm.name?.firstname ?? userProfile.name?.firstname ?? '',
@@ -248,6 +292,8 @@ const Profile: React.FC = () => {
         if (toSave.img) setProfilePicCache(toSave.img);
         setIsEditing(false);
         setEditForm({});
+        setOtherNationality('');
+        setOtherReligion('');
       } catch (writeErr) {
         // Revert optimistic update on failure and surface error.
         setUserProfile(prevSnapshot);
@@ -259,6 +305,23 @@ const Profile: React.FC = () => {
       setIsSaving(false);
     }
   };
+
+  const ageValidationLabel = (() => {
+    if (!editForm.dateOfBirth) return 'Age will be calculated from your date of birth.';
+
+    const dob = new Date(editForm.dateOfBirth);
+    const today = new Date();
+    let calculatedAge = today.getFullYear() - dob.getFullYear();
+    const monthDifference = today.getMonth() - dob.getMonth();
+    if (monthDifference < 0 || (monthDifference === 0 && today.getDate() < dob.getDate())) calculatedAge--;
+
+    if (Number.isNaN(dob.getTime()) || dob > today) return 'Enter a valid date of birth.';
+    if (calculatedAge < 10) return 'You must be at least 10 years old.';
+    return `Age: ${calculatedAge} years old`;
+  })();
+
+  const ageValidationError = ageValidationLabel === 'Enter a valid date of birth.' ||
+    ageValidationLabel === 'You must be at least 10 years old.';
 
   if (!userProfile && !error) {
     return (
@@ -287,7 +350,7 @@ const Profile: React.FC = () => {
           <IonButtons slot="end">
             {!isEditing && (
               <IonButton onClick={handleEditProfile}>
-                <IonIcon icon={createOutline} slot="start" />
+                <IonIcon slot="start" />
                 Edit
               </IonButton>
             )}
@@ -413,13 +476,6 @@ const Profile: React.FC = () => {
                       </IonLabel>
                     </IonItem>
 
-                    <IonItem>
-                      <IonIcon icon={callOutline} slot="start" />
-                      <IonLabel>
-                        <h3>Contact Number</h3>
-                        <p>{userProfile.contactNumber || '-'}</p>
-                      </IonLabel>
-                    </IonItem>
                   </IonList>
                 </>
               ) : (
@@ -442,15 +498,6 @@ const Profile: React.FC = () => {
                       <IonLabel position="stacked">Nickname</IonLabel>
                       <IonInput value={editForm.nickname} placeholder="Enter nickname" onIonChange={e => handleInputChange('nickname', e.detail.value!)} />
                     </IonItem>
-                    <IonItem>
-                      <IonLabel position="stacked">Contact Number</IonLabel>
-                      <IonInput
-                        type="tel"
-                        value={editForm.contactNumber}
-                        placeholder="09XXXXXXXXX"
-                        onIonChange={e => handleInputChange('contactNumber', e.detail.value!)}
-                      />
-                    </IonItem>
                   </IonList>
 
                   <h2 className="edit-section-label">Personal Details</h2>
@@ -471,17 +518,26 @@ const Profile: React.FC = () => {
                           }
                         }}
                       />
+                      <IonLabel className={`age-validation-label${ageValidationError ? ' age-validation-label--error' : ''}`}>
+                        {ageValidationLabel}
+                      </IonLabel>
                     </IonItem>
-                    <IonItem>
-                      <IonLabel position="stacked">Nationality</IonLabel>
-                      <IonInput value={editForm.nationality} placeholder="Enter nationality" onIonChange={e => handleInputChange('nationality', e.detail.value!)} />
-                    </IonItem>
-                    <IonItem>
-                      <IonLabel position="stacked">Religion</IonLabel>
-                      <IonSelect placeholder="Select religion" value={editForm.religion || ''} onIonChange={e => handleInputChange('religion', e.detail.value)}>
-                        {RELIGIONS.map(r => <IonSelectOption key={r} value={r}>{r}</IonSelectOption>)}
-                      </IonSelect>
-                    </IonItem>
+                    <OtherSelect
+                      label="Nationality"
+                      options={NATIONALITIES}
+                      value={editForm.nationality || ''}
+                      otherValue={otherNationality}
+                      onChange={value => handleInputChange('nationality', value)}
+                      onOtherChange={setOtherNationality}
+                    />
+                    <OtherSelect
+                      label="Religion"
+                      options={RELIGIONS}
+                      value={editForm.religion || ''}
+                      otherValue={otherReligion}
+                      onChange={value => handleInputChange('religion', value)}
+                      onOtherChange={setOtherReligion}
+                    />
                     <IonItem>
                       <IonLabel position="stacked">Gender</IonLabel>
                       <IonSelect placeholder="Select gender" value={editForm.gender || ''} onIonChange={e => handleInputChange('gender', e.detail.value)}>
@@ -512,7 +568,7 @@ const Profile: React.FC = () => {
                     </IonButtons>
                     <IonButtons slot="end">
                       <IonButton color="primary" onClick={handleSave} disabled={isSaving}>
-                        <IonIcon icon={save} slot="start" />Save
+                        <IonIcon slot="start" />Save
                       </IonButton>
                     </IonButtons>
                   </IonToolbar>

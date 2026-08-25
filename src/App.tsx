@@ -47,6 +47,7 @@ import BookingHistory    from './pages/Settings/Tour/Tour';
 import Scan              from './pages/Settings/Scan/Scan';
 import Tourguidefeedback from './pages/TourSession/Tourguidefeedback/TourGuideFeedback';
 import About             from './pages/Settings/About';
+import Permissions       from './pages/Settings/Permissions';
 import Help              from './pages/Settings/Help';
 import ReportProblem     from './pages/Settings/ReportProblem/ReportProblem';
 import ContactSupport    from './pages/Settings/ContactSupport/ContactSupport';
@@ -156,6 +157,7 @@ const App: React.FC = () => {
             <Route exact path="/settings/verify-email" component={VerifyEmail} />
             <Route exact path="/settings/verify-phone" component={VerifyPhone} />
             <Route exact path="/settings/about" component={About}             />
+            <Route exact path="/settings/permissions" component={Permissions} />
             <Route exact path="/settings/help"  component={Help}              />
             <Route exact path="/settings/report-problem" component={ReportProblem}     />
             <Route exact path="/settings/contact-support" component={ContactSupport}   />

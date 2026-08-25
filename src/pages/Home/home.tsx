@@ -12,7 +12,7 @@ import {
   location, star, heart, heartOutline,
   cloudOfflineOutline,
 } from 'ionicons/icons';
-import { collection, doc, onSnapshot } from 'firebase/firestore';
+import { collection, doc, limit, onSnapshot, orderBy, query } from 'firebase/firestore';
 import { firestore } from '../../firebase';
 import { useAuth } from '../../context/AuthContext';
 import {
@@ -38,7 +38,7 @@ const Home: React.FC = () => {
   const history = useHistory();
   const { isAuthenticated, isLoading: authLoading, user } = useAuth();
   const { coords } = useUserLocation();
-  const { triggerManual } = useProximityAI();
+  const { triggerGeneric } = useProximityAI();
 
   const [profilePic, setProfilePic]   = useState('/assets/images/Temporary.png');
   const [firstName, setFirstName]     = useState('');
@@ -116,23 +116,29 @@ const Home: React.FC = () => {
   useEffect(() => {
     if (authLoading || !isAuthenticated) return;
 
-    const unsub = onSnapshot(
-      collection(firestore, 'visits'),
-      (snap) => {
-        const countMap = new Map<string, number>();
-        snap.forEach(d => {
-          const name: string = (d.data() as any).destinationTop ?? '';
-          if (name) countMap.set(name, (countMap.get(name) ?? 0) + 1);
-        });
-        const ranked = Array.from(countMap.entries()).sort((a, b) => b[1] - a[1]);
-        const rankMap = new Map<string, number>();
-        ranked.forEach(([name], i) => rankMap.set(name, i + 1));
-        setVisitRanks(rankMap);
-      },
-      (err) => console.error('[Home] visits onSnapshot error:', err),
-    );
+    let unsubscribe: (() => void) | null = null;
+    const timer = window.setTimeout(() => {
+      unsubscribe = onSnapshot(
+        query(collection(firestore, 'visits'), orderBy('createdAt', 'desc'), limit(500)),
+        (snap) => {
+          const countMap = new Map<string, number>();
+          snap.forEach(d => {
+            const name: string = (d.data() as any).destinationTop ?? '';
+            if (name) countMap.set(name, (countMap.get(name) ?? 0) + 1);
+          });
+          const ranked = Array.from(countMap.entries()).sort((a, b) => b[1] - a[1]);
+          const rankMap = new Map<string, number>();
+          ranked.forEach(([name], i) => rankMap.set(name, i + 1));
+          setVisitRanks(rankMap);
+        },
+        (err) => console.error('[Home] visits onSnapshot error:', err),
+      );
+    }, 1200);
 
-    return () => unsub();
+    return () => {
+      window.clearTimeout(timer);
+      unsubscribe?.();
+    };
   }, [authLoading, isAuthenticated]);
 
   // ── real-time RTDB favorites listener ────────────────────────────────────
@@ -210,7 +216,7 @@ const Home: React.FC = () => {
   /** Navigate to Maps when the user taps or types in the searchbar */
   const goToMaps = () => history.push('/maps');
 
-  // ── AI FAB: tap = open AI Guide, long-press = fire a test "AI Talking" ──
+  // ── AI FAB: tap = open AI Guide, long-press = start a normal AI conversation ──
   const LONG_PRESS_MS = 600;
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const longPressFiredRef = useRef(false);
@@ -222,10 +228,11 @@ const Home: React.FC = () => {
     // never gets to run — every press resolves as a tap no matter how long
     // you actually hold it.
     e.preventDefault();
+    e.currentTarget.setPointerCapture?.(e.pointerId);
     longPressFiredRef.current = false;
     longPressTimerRef.current = setTimeout(() => {
       longPressFiredRef.current = true;
-      triggerManual();
+      triggerGeneric();
     }, LONG_PRESS_MS);
   };
 
@@ -295,9 +302,9 @@ const Home: React.FC = () => {
       )}
 
       <IonContent fullscreen>
-        {/* AI guide FAB — tap opens AI Guide, long-press (600ms) fires a test AI Talking narration */}
+        {/* AI guide FAB — tap opens AI Guide, long-press (600ms) starts a normal AI conversation */}
         <div className="ai-nav-button" role="button"
-          aria-label="Open AI Guide (long-press to test AI Talking)"
+          aria-label="Open AI Guide (long-press to start a normal AI conversation)"
           onClick={handleAiClick}
           onPointerDown={handleAiPressStart}
           onPointerUp={clearAiPressTimer}

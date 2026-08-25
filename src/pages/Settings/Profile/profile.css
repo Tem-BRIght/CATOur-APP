@@ -2,6 +2,7 @@
   --background: #f0f4f8;
 }
 
+
 /* ── Top hero section (gradient — avatar only) ── */
 .profile-page-top-section {
   text-align: center;
@@ -205,6 +206,20 @@
   color: #1a2540 !important;
   --placeholder-color: #c5d0e0;
   --placeholder-font-style: normal;
+}
+
+.edit-list ion-label.age-validation-label {
+  display: block;
+  margin-top: 6px !important;
+  color: #6b7280 !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+  text-transform: none !important;
+  letter-spacing: 0 !important;
+}
+
+.edit-list ion-label.age-validation-label--error {
+  color: #dc2626 !important;
 }
 
 /* Save/Cancel toolbar */

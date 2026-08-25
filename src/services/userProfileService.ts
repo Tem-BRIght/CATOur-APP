@@ -3,7 +3,7 @@
 // Manages user profile documents stored in Firestore (collection: "users").
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { doc, setDoc, getDoc, updateDoc } from 'firebase/firestore';
+import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { firestore } from '../firebase';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -42,6 +42,8 @@ export interface UserProfile {
   isFullyRegistered?: boolean;
   acceptedTerms?:     boolean;
   createdAt?:         string;
+  deletionStatus?:    'active' | 'scheduled';
+  deletionAt?:        any;
   [key: string]: any;
 }
 
@@ -120,8 +122,7 @@ const TRACKED_FIELDS: { check: (p: UserProfile) => boolean }[] = [
   { check: p => !!p.name?.firstname?.trim() },
   { check: p => !!p.name?.surname?.trim() },
   { check: p => !!p.nickname?.trim() },
-  { check: p => !!p.email?.trim() },
-  { check: p => !!p.contactNumber?.trim() },
+  { check: p => !!p.email?.trim() && p.emailVerified === true },
   { check: p => !!p.dateOfBirth?.trim() },
   { check: p => !!p.gender?.trim() },
   { check: p => !!p.nationality?.trim() },
@@ -167,7 +168,7 @@ export const updateUserProfile = async (
       payload.addressStructured = addressStructured;
     }
 
-    await updateDoc(userRef(userId), payload);
+    await setDoc(userRef(userId), payload, { merge: true });
   } catch (err: any) {
     console.error('[userProfileService] updateUserProfile failed:', err);
     throw err;

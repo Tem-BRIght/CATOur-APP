@@ -5,6 +5,7 @@ import {
   IonButtons, IonButton, IonIcon, IonImg, IonModal, IonFooter,
   IonText, IonLoading, IonBadge, IonToast,
 } from '@ionic/react';
+import { collection, doc, getDoc, getDocs, limit, onSnapshot, orderBy, query } from 'firebase/firestore';
 import {
   arrowBack, location as locationIcon, star, shareSocial,
   heart, heartOutline, time, cash, people, car, refresh,
@@ -20,9 +21,6 @@ import {
   MarkerF,
   DirectionsRenderer,
 } from '@react-google-maps/api';
-import {
-  collection, getDocs, query, orderBy, doc, getDoc, onSnapshot,
-} from 'firebase/firestore';
 import { firestore } from '../../../firebase';
 import { Destination, InfoBlock } from '../../../types';
 import { fetchDestinationById, fetchDestinations } from '../../../services/destinationService';
@@ -331,7 +329,7 @@ const DestinationDetail: React.FC = () => {
     if (!destName) return;
     (async () => {
       try {
-        const snap     = await getDocs(collection(firestore, 'visits'));
+        const snap     = await getDocs(query(collection(firestore, 'visits'), orderBy('createdAt', 'desc'), limit(500)));
         const countMap = new Map<string, number>();
         snap.forEach(d => {
           const name: string = (d.data() as any).destinationTop ?? '';
@@ -565,6 +563,11 @@ const DestinationDetail: React.FC = () => {
     const reviewEntry = review || liveReviews.find(r => r.id === reviewId) || reviews.find(r => r.id === reviewId);
     if (!state?.text.trim() || state.submitting) return;
     if (!user) { setToastMsg('Please log in to reply.'); return; }
+    if (reviewEntry && reviewEntry.allowVenueReply === false) {
+      setToastMsg('Replies are disabled for this review.');
+      setReplyMap(prev => ({ ...prev, [reviewId]: { ...prev[reviewId], open: false, text: '', submitting: false } }));
+      return;
+    }
 
     // For static fallback reviews we might not have live Firestore ID; prefer userId if available.
     let targetReviewId = reviewId;
@@ -1053,7 +1056,7 @@ const DestinationDetail: React.FC = () => {
             </button>
             <button
               className="dd-action-btn"
-              onClick={() => document.getElementById('destination-tour-types')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+              onClick={() => history.push('/tour')}
             >
               <IonIcon icon={people} /><span>Tour</span>
             </button>
@@ -1304,12 +1307,14 @@ const DestinationDetail: React.FC = () => {
                       {/* ── Reply + owner actions ── */}
                       {user && (
                         <div className="dd-review-actions">
-                          <button
-                            className={`dd-reply-toggle-btn ${replyState.open ? 'dd-reply-toggle-btn--active' : ''}`}
-                            onClick={() => toggleReply(rev.id || String(i))}
-                          >
-                             {replyState.open ? 'Cancel' : 'Reply'}
-                          </button>
+                          {rev.allowVenueReply !== false && (
+                            <button
+                              className={`dd-reply-toggle-btn ${replyState.open ? 'dd-reply-toggle-btn--active' : ''}`}
+                              onClick={() => toggleReply(rev.id || String(i))}
+                            >
+                               {replyState.open ? 'Cancel' : 'Reply'}
+                            </button>
+                          )}
 
                           {/* Only the author sees Edit / Delete */}
                           {isCurrentUser && (
@@ -1412,7 +1417,6 @@ const DestinationDetail: React.FC = () => {
                 {itineraryData.map((day) => (
                   <div key={day.day} className="itin-day-card">
                     <div className="itin-day-header">
-                      <span className="itin-day-badge">Day {day.day}</span>
                       <span className="itin-day-theme">{day.theme}</span>
                     </div>
                     <div className="itin-slots">
@@ -1439,7 +1443,11 @@ const DestinationDetail: React.FC = () => {
               </div>
             ) : itinerary ? (
               <IonText><pre className="itinerary-text">{itinerary}</pre></IonText>
-            ) : null}
+            ) : (
+              <IonText>
+                <p className="itinerary-text">No activities were generated. Please try again.</p>
+              </IonText>
+            )}
           </IonContent>
         </IonModal>
 
@@ -1458,6 +1466,14 @@ const DestinationDetail: React.FC = () => {
                       zoomControl: true,
                       streetViewControl: false,
                       fullscreenControl: false,
+                      gestureHandling: 'greedy',
+                      clickableIcons: false,
+                      styles: [
+                        {
+                          featureType: 'poi',
+                          stylers: [{ visibility: 'off' }],
+                        },
+                      ],
                     }}
                     onLoad={handleMapLoad}
                   >

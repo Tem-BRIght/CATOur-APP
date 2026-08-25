@@ -180,6 +180,18 @@ ion-toolbar {
   letter-spacing: 0.2px;
 }
 
+.age-validation-label {
+  display: block;
+  margin-top: -8px;
+  color: #6b7280;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.age-validation-label--error {
+  color: #dc2626;
+}
+
 /* ── Photo Upload ─────────────────────────────────────────────────────── */
 .photo-upload {
   display: flex;
