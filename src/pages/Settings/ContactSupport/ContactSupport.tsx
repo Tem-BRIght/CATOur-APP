@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   IonPage,
   IonHeader,
@@ -27,7 +27,7 @@ import {
   sendOutline,
   checkmarkCircleOutline,
 } from 'ionicons/icons';
-import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
+import { collection, doc, onSnapshot, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore';
 import { useAuth } from '../../../context/AuthContext';
 import { firestore } from '../../../firebase';
 
@@ -37,11 +37,23 @@ const ContactSupport: React.FC = () => {
   const [message, setMessage] = useState('');
   const [showToast, setShowToast] = useState(false);
   const [toastMsg, setToastMsg] = useState('');
+  const [ticketId, setTicketId] = useState<string | null>(null);
+  const [ticketMessages, setTicketMessages] = useState<any[]>([]);
   const { user } = useAuth();
 
   const now = new Date();
   const hour = now.getHours();
   const isOpen = hour >= 9 && hour < 17; // 9 AM – 5 PM
+
+  useEffect(() => {
+    if (!ticketId) return;
+    const ticketRef = doc(firestore, 'supportTickets', ticketId);
+    const messagesRef = collection(ticketRef, 'messages');
+    return onSnapshot(messagesRef, snapshot => {
+      setTicketMessages(snapshot.docs.map(item => ({ id: item.id, ...item.data() })));
+      void updateDoc(ticketRef, { unreadByUser: false });
+    });
+  }, [ticketId]);
 
   const handleSendMessage = async () => {
     if (!message.trim()) {
@@ -51,16 +63,44 @@ const ContactSupport: React.FC = () => {
     }
 
     try {
-      await addDoc(collection(firestore, 'supportTickets'), {
-        uid: user?.uid || null,
-        userId: user?.uid || null,
-        userEmail: user?.email || null,
-        email: user?.email || null,
-        userName: user?.displayName || user?.email?.split('@')[0] || 'Tourist',
-        message: message.trim(),
-        status: 'open',
+      if (!user?.uid) throw new Error('You must be signed in to contact support.');
+
+      const text = message.trim();
+      const ticketRef = ticketId
+        ? doc(firestore, 'supportTickets', ticketId)
+        : doc(collection(firestore, 'supportTickets'));
+      const messageRef = doc(collection(ticketRef, 'messages'));
+      if (!ticketId) {
+        await setDoc(ticketRef, {
+          uid: user.uid,
+          userId: user.uid,
+          userEmail: user.email || null,
+          email: user.email || null,
+          userName: user.displayName || user.email?.split('@')[0] || 'Tourist',
+          message: text,
+          lastMessage: text,
+          lastMessageAt: serverTimestamp(),
+          assignedAdminId: null,
+          status: 'open',
+          unreadByAdmin: true,
+          unreadByUser: false,
+          createdAt: serverTimestamp(),
+        });
+      }
+      await setDoc(messageRef, {
+        senderId: user.uid,
+        senderRole: 'user',
+        text,
         createdAt: serverTimestamp(),
+        readAt: null,
       });
+      await updateDoc(ticketRef, {
+        lastMessage: text,
+        lastMessageAt: serverTimestamp(),
+        unreadByAdmin: true,
+        unreadByUser: false,
+      });
+      setTicketId(ticketRef.id);
       setToastMsg("Message sent! We'll get back to you shortly.");
       setShowToast(true);
       setMessage('');
@@ -217,6 +257,18 @@ const ContactSupport: React.FC = () => {
             Send Message
           </IonButton>
         </div>
+
+        {ticketId && (
+          <div className="support-conversation" aria-live="polite">
+            <h3>Your support conversation</h3>
+            {ticketMessages.map(item => (
+              <div key={item.id} className={`support-message${item.senderRole === 'admin' ? ' support-message--admin' : ''}`}>
+                <strong>{item.senderRole === 'admin' ? 'Support' : 'You'}</strong>
+                <p>{item.text}</p>
+              </div>
+            ))}
+          </div>
+        )}
 
         <IonToast
           isOpen={showToast}

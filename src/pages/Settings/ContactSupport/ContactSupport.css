@@ -1,3 +1,7 @@
+.support-conversation { margin: 16px; padding: 12px; }
+.support-message { margin: 8px 0; padding: 10px 12px; border-radius: 10px; background: var(--ion-color-light); }
+.support-message--admin { background: var(--ion-color-primary-tint); }
+.support-message p { margin: 4px 0 0; white-space: pre-wrap; }
 /* Page background */
 ion-content {
   --background: #f9fafb;

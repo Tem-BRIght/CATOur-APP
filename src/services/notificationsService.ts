@@ -93,6 +93,7 @@ export type NotifType =
   | 'visit'
   | 'reply'
   | 'destination';
+  | 'new_message';
 
 export interface AppNotification {
   id:        string;
@@ -104,6 +105,7 @@ export interface AppNotification {
   destinationId?: string;
   reviewId?:      string;
   replyId?:       string;
+  ticketId?:     string;
 }
 
 // ── Firestore refs ────────────────────────────────────────────────────────────
@@ -147,6 +149,7 @@ export function subscribeNotifications(
           destinationId:  data.destinationId ?? undefined,
           reviewId:       data.reviewId      ?? undefined,
           replyId:        data.replyId       ?? undefined,
+          ticketId:       data.ticketId     ?? undefined,
         };
       });
       onChange(items);

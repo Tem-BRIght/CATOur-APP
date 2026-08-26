@@ -7,6 +7,7 @@ import {
 import {
   heart, star, location, informationCircle,
   notifications, checkmarkDone, qrCode,
+  chatbubbleEllipsesOutline,
 } from 'ionicons/icons';
 import { useAuth } from '../../../context/AuthContext';
 import {
@@ -30,6 +31,7 @@ const TYPE_META: Record<NotifType, { icon: string; cls: string }> = {
   visit:       { icon: qrCode,             cls: 'location'    },
   reply:       { icon: heart,              cls: 'reply'       },
   destination: { icon: location,           cls: 'destination' },
+  new_message: { icon: chatbubbleEllipsesOutline, cls: 'info' },
 };
 
 // ── Section bucketing ─────────────────────────────────────────────────────────

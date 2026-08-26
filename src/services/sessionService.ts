@@ -481,6 +481,58 @@ export async function cancelSession(sessionId: string, reason?: string): Promise
   await updateSessionStatus(sessionId, 'Cancelled', reason);
 }
 
+export async function cancelJoinedSession(
+  sessionId: string,
+  userId: string,
+  reason: string,
+): Promise<void> {
+  const trimmedReason = reason.trim();
+  if (!trimmedReason) throw new Error('Please provide a valid reason for cancelling this tour.');
+
+  await runTransaction(firestore, async (transaction) => {
+    const sessionRef = sessionDoc(sessionId);
+    const sessionSnap = await transaction.get(sessionRef);
+    if (!sessionSnap.exists()) throw new Error('Session not found');
+
+    const session = sessionSnap.data() as TourSession;
+    if (session.status !== 'pending') {
+      throw new Error('This tour can only be cancelled before it starts.');
+    }
+    if (!session.touristUids?.includes(userId)) {
+      throw new Error('You are not joined to this tour.');
+    }
+
+    const guideRef = doc(firestore, 'tourGuides', session.guideId);
+    const guideSnap = await transaction.get(guideRef);
+    if (!guideSnap.exists()) throw new Error('Tour guide not found');
+
+    const slots = Array.isArray(guideSnap.data().availabilitySlots)
+      ? [...guideSnap.data().availabilitySlots]
+      : [];
+    const sessionStart = new Date(session.startTime).getTime();
+    const slotIndex = slots.findIndex((slot: any) =>
+      new Date(`${slot.date}T${slot.startTime}:00`).getTime() === sessionStart
+    );
+    if (slotIndex < 0) throw new Error('The assigned tour slot could not be found.');
+
+    const slot = { ...slots[slotIndex] };
+    const previousBookedCount = Number(slot.bookedCount ?? slot.sessionCount ?? 0);
+    const previousSessionCount = Number(slot.sessionCount ?? previousBookedCount);
+    slot.joinedUserIds = (Array.isArray(slot.joinedUserIds) ? slot.joinedUserIds : [])
+      .filter((id: string) => id !== userId);
+    slot.bookedCount = Math.max(0, previousBookedCount - 1);
+    slot.sessionCount = Math.max(0, previousSessionCount - 1);
+    slots[slotIndex] = slot;
+
+    transaction.update(guideRef, { availabilitySlots: slots });
+    transaction.update(sessionRef, {
+      status: 'Cancelled',
+      cancelReason: trimmedReason,
+      cancelledAt: new Date().toISOString(),
+    });
+  });
+}
+
 /**
  * markStopVisited
  * Guide-only action: flags a tour stop (by destination ID) as visited/done.

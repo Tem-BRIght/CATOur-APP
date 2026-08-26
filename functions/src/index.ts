@@ -318,6 +318,50 @@ export const onNewChatMessage = onDocumentCreated(
   }
 );
 
+export const onNewSupportMessage = onDocumentCreated(
+  { document: 'supportTickets/{ticketId}/messages/{messageId}', region: 'us-central1' },
+  async (event) => {
+    const snap = event.data;
+    if (!snap) return;
+    const message = snap.data() || {};
+    if (message.senderRole !== 'user' || typeof message.text !== 'string' || !message.text.trim()) return;
+
+    const ticketId = event.params.ticketId as string;
+    const ticketSnap = await firestore.collection('supportTickets').doc(ticketId).get();
+    if (!ticketSnap.exists) return;
+    const ticket = ticketSnap.data() || {};
+    const snippet = message.text.length > 80 ? `${message.text.slice(0, 77)}...` : message.text;
+    const admins = await firestore.collection('admins').get();
+
+    const recipients = ticket.assignedAdminId
+      ? admins.docs.filter(adminDoc => adminDoc.id === ticket.assignedAdminId)
+      : admins.docs;
+    await Promise.all(recipients.map(async adminDoc => {
+      const adminId = adminDoc.id;
+      await firestore.collection('notifications').doc(adminId).collection('items').add({
+        type: 'new_message',
+        title: `New support message from ${ticket.userName || 'User'}`,
+        message: snippet,
+        unread: true,
+        createdAt: FieldValue.serverTimestamp(),
+        ticketId,
+      });
+
+      const tokensSnap = await firestore.collection('users').doc(adminId).collection('fcmTokens').get();
+      if (tokensSnap.empty) return;
+      await messaging.sendEachForMulticast({
+        tokens: tokensSnap.docs.map(token => token.id),
+        notification: { title: 'New support message', body: snippet },
+        data: { type: 'new_message', ticketId, link: `/support/tickets/${ticketId}/chat` },
+        webpush: {
+          notification: { icon: '/assets/icon/catour.png' },
+          fcmOptions: { link: `/support/tickets/${ticketId}/chat` },
+        },
+      });
+    }));
+  }
+);
+
 export const setEmailVerified = onCall<{ targetUid: string; verified: boolean }, Promise<{ success: boolean }>>(
   { region: 'us-central1', cors: true },
   async (request) => {

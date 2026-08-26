@@ -16,8 +16,21 @@ const messaging = firebase.messaging();
 
 messaging.onBackgroundMessage((payload) => {
   const { title, body } = payload.notification || {};
+  const data = payload.data || {};
   self.registration.showNotification(title || 'CATOUR', {
     body: body || '',
     icon: '/assets/icon/catour.png',
+    data: { link: data.link || '/notifications' },
   });
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const link = event.notification.data?.link || '/notifications';
+  event.waitUntil(clients.matchAll({ type: 'window', includeUncontrolled: true }).then(windowClients => {
+    const target = new URL(link, self.location.origin).href;
+    const existing = windowClients.find(client => client.url === target);
+    if (existing && 'focus' in existing) return existing.focus();
+    return clients.openWindow(target);
+  }));
 });

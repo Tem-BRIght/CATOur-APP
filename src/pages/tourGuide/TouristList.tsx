@@ -707,7 +707,18 @@ const TouristList: React.FC = () => {
                       <div className="row-col-email">{tourist.email}</div>
                       {isEndedSession && (
                         <div className={`row-col-feedback ${reviewedTouristIds.has(tourist.uid) ? 'feedback-reviewed' : 'feedback-pending'}`}>
-                          {reviewedTouristIds.has(tourist.uid) ? 'Reviewed' : 'Pending'}
+                          {reviewedTouristIds.has(tourist.uid) ? (
+                            <IonButton
+                              fill="clear"
+                              size="small"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                history.push(`/reviews/${session.id}?touristId=${encodeURIComponent(tourist.uid)}`);
+                              }}
+                            >
+                              View Feedback
+                            </IonButton>
+                          ) : 'Pending'}
                         </div>
                       )}
                     </IonItem>

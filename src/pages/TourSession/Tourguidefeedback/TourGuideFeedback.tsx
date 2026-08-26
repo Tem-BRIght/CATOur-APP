@@ -34,6 +34,7 @@ import { useAuth } from '../../../context/AuthContext';
 import { getSession, TourSession } from '../../../services/sessionService';
 import {
   hasSubmittedFeedback,
+  getFeedback,
   submitGuideFeedback,
 } from '../../../services/feedbackService';
 import './TourGuideFeedback.css';
@@ -59,6 +60,11 @@ const TourGuideFeedback: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [session, setSession] = useState<TourSession | null>(null);
   const [alreadySubmitted, setAlreadySubmitted] = useState(false);
+  const [savedFeedback, setSavedFeedback] = useState<{
+    rating: number;
+    categoryRatings?: Partial<Record<CategoryKey, number>>;
+    comment?: string;
+  } | null>(null);
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [toastMsg, setToastMsg] = useState('');
@@ -87,6 +93,12 @@ const TourGuideFeedback: React.FC = () => {
         if (data && currentUser) {
           const already = await hasSubmittedFeedback(sessionId, currentUser.uid);
           setAlreadySubmitted(already);
+          if (already) {
+            const feedback = await getFeedback(sessionId, currentUser.uid);
+            if (feedback) {
+              setSavedFeedback(feedback as typeof savedFeedback);
+            }
+          }
         }
       } catch (err) {
         console.error('Failed to load session:', err);
@@ -124,6 +136,7 @@ const TourGuideFeedback: React.FC = () => {
         categoryRatings,
         comment,
       });
+      setSavedFeedback({ rating: overallRating, categoryRatings, comment });
       setSubmitted(true);
     } catch (err) {
       console.error('Failed to submit feedback:', err);
@@ -198,6 +211,24 @@ const TourGuideFeedback: React.FC = () => {
                 ? `Your feedback for ${session.guideName} has been submitted.`
                 : `You've already shared your feedback for this tour.`}
             </p>
+            {savedFeedback && (
+              <div className="tf-submitted-feedback">
+                <div className="tf-submitted-rating">
+                  <span>Your rating</span>
+                  <strong>{savedFeedback.rating}/5</strong>
+                </div>
+                <div className="tf-submitted-categories">
+                  {CATEGORIES.map(({ key, label }) => (
+                    <span key={key}>
+                      {label}: {savedFeedback.categoryRatings?.[key] || '—'}/5
+                    </span>
+                  ))}
+                </div>
+                <p className="tf-submitted-comment">
+                  {savedFeedback.comment ? `"${savedFeedback.comment}"` : 'No comment provided.'}
+                </p>
+              </div>
+            )}
             <IonButton className="tf-home-btn" onClick={() => history.push('/home')}>
               Back to Home
             </IonButton>

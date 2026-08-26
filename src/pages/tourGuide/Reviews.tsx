@@ -11,7 +11,7 @@ import {
   IonFooter,
   IonSpinner,
 } from '@ionic/react';
-import { useHistory, useParams } from 'react-router-dom';
+import { useHistory, useLocation, useParams } from 'react-router-dom';
 import { arrowBackOutline, star, starOutline } from 'ionicons/icons';
 import { collection, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
 import { firestore } from '../../firebase';
@@ -25,8 +25,10 @@ export const getReviewTargetId = (guideId?: string, sessionId?: string) =>
 
 const Reviews: React.FC = () => {
   const history = useHistory();
+  const location = useLocation();
   const { guideId, sessionId } = useParams<{ guideId?: string; sessionId?: string }>();
   const reviewTargetId = getReviewTargetId(guideId, sessionId);
+  const touristId = new URLSearchParams(location.search).get('touristId') || '';
   const [reviews, setReviews] = useState<any[]>([]);
   const [pending, setPending] = useState<{ sessionId: string; touristUid: string; touristName: string; destinationName: string; startTime: string }[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -70,9 +72,10 @@ const Reviews: React.FC = () => {
             const bTs = b.createdAt && typeof b.createdAt?.toDate === 'function' ? b.createdAt.toDate().getTime() : new Date(b.createdAt || 0).getTime();
             return bTs - aTs;
           });
-        const sessionReviews = sessionId
-          ? data.filter((review: any) => review.sessionId === sessionId)
-          : data;
+        const sessionReviews = data.filter((review: any) =>
+          (!sessionId || review.sessionId === sessionId) &&
+          (!touristId || review.touristId === touristId)
+        );
         setReviews(sessionReviews);
 
         // Cross-reference every ended session's tourist list against the
@@ -90,6 +93,7 @@ const Reviews: React.FC = () => {
           if (sessionId && s.id !== sessionId) return;
           if (s.status !== 'ended') return; // only ended tours are eligible for feedback
           (s.tourists || []).forEach((t) => {
+            if (touristId && t.uid !== touristId) return;
             const key = `${s.id}_${t.uid}`;
             if (!reviewedKeys.has(key)) {
               pendingList.push({
@@ -111,7 +115,7 @@ const Reviews: React.FC = () => {
     };
 
     loadReviews();
-  }, [guideId, reviewTargetId, sessionId]);
+  }, [guideId, reviewTargetId, sessionId, touristId]);
 
   const totalReviews = reviews.length;
 

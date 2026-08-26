@@ -41,7 +41,7 @@ import {
   TourTypeWithSchedules,
   UpcomingSlotGroup,
 } from '../../../services/tourScheduleService';
-import { getUserJoinedSessions } from '../../../services/sessionService';
+import { cancelJoinedSession, getUserJoinedSessions } from '../../../services/sessionService';
 import type { TourSession } from '../../../services/sessionService';
 import './Tour.css';
 
@@ -274,6 +274,26 @@ const TourPage: React.FC = () => {
     }
   };
 
+  const handleCancelJoinedSession = async (session: TourSession) => {
+    if (!user?.uid || session.status !== 'pending') return;
+    const reason = window.prompt('Enter a valid reason for cancelling this joined tour:', '');
+    if (reason === null) return;
+    if (!reason.trim()) {
+      setToastMsg('A valid cancellation reason is required.');
+      return;
+    }
+
+    try {
+      await cancelJoinedSession(session.id, user.uid, reason);
+      setJoinedSessions((current) => current.map((item) => item.id === session.id
+        ? { ...item, status: 'Cancelled', cancelReason: reason.trim() }
+        : item));
+      setToastMsg('Joined tour cancelled.');
+    } catch (err: any) {
+      setToastMsg(err.message || 'Could not cancel this tour.');
+    }
+  };
+
   // ── Toggle expand tour type ─────────────────────────────────────────────
 
   const toggleExpand = (typeId: string) => {
@@ -447,6 +467,7 @@ const TourPage: React.FC = () => {
                     const isCancelled = s.status === 'Cancelled';
                     const isEnded = s.status === 'ended';
                     const isActive = s.status === 'active';
+                  const isPending = s.status === 'pending';
                     const dotClass = isCancelled
                       ? 'ht-dot--cancelled'
                       : isEnded ? 'ht-dot--completed' : 'ht-dot--confirmed';
@@ -505,10 +526,14 @@ const TourPage: React.FC = () => {
                           {s.startTime && (
                             <span className="ht-chip">
                               <IonIcon icon={timeOutline} />{' '}
-                              {new Date(s.startTime).toLocaleTimeString('en-US', {
+                              {isEnded ? 'Started ' : 'Scheduled '}{new Date(s.startTime).toLocaleTimeString('en-US', {
                                 hour: 'numeric',
                                 minute: '2-digit',
                               })}
+                              {s.endTime && ` - ${new Date(s.endTime).toLocaleTimeString('en-US', {
+                                hour: 'numeric',
+                                minute: '2-digit',
+                              })}`}
                             </span>
                           )}
                         </div>
@@ -538,6 +563,19 @@ const TourPage: React.FC = () => {
                               }}
                             >
                               Feedback
+                            </IonButton>
+                          )}
+                          {isPending && (
+                            <IonButton
+                              fill="clear"
+                              size="small"
+                              className="ht-action-btn ht-action-btn--cancel"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                void handleCancelJoinedSession(s);
+                              }}
+                            >
+                              Cancel Join
                             </IonButton>
                           )}
                         </div>

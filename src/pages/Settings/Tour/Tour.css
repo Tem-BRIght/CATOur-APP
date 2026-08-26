@@ -766,6 +766,10 @@ ion-title {
   transition: opacity 0.15s;
 }
 
+.ht-action-btn--cancel {
+  color: #b91c1c;
+}
+
 .ht-action-btn:active { opacity: 0.8; }
 
 .ht-action-call {

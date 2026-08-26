@@ -129,6 +129,12 @@ service cloud.firestore {
         request.resource.data.touristUids.hasAny([request.auth.uid]) &&
         request.resource.data.touristUids.size() == resource.data.touristUids.size() + 1 &&
         request.resource.data.tourists.size() == resource.data.tourists.size() + 1
+      ) || (
+        isSignedIn() && resource.data.status == 'pending' &&
+        resource.data.touristUids is list && resource.data.touristUids.hasAny([request.auth.uid]) &&
+        request.resource.data.status == 'Cancelled' &&
+        request.resource.data.cancelReason is string && request.resource.data.cancelReason.size() > 0 &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'cancelReason', 'cancelledAt'])
       );
       allow delete: if isSignedIn() && (resource.data.guideId == request.auth.uid || isAdmin());
     }
@@ -241,7 +247,25 @@ service cloud.firestore {
     match /supportTickets/{ticketId} {
       allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
       allow read: if isAdmin() || isOwner(resource.data.userId);
-      allow update, delete: if isAdmin() || isOwner(resource.data.userId);
+      allow update: if isAdmin() || (isOwner(resource.data.userId) &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'lastMessage', 'lastMessageAt', 'unreadByUser', 'status'
+        ]));
+      allow delete: if isSuperAdmin() || isOwner(resource.data.userId);
+
+      match /messages/{messageId} {
+        allow read: if isAdmin() || isOwner(get(/databases/$(database)/documents/supportTickets/$(ticketId)).data.userId);
+        allow create: if isSignedIn() && request.resource.data.senderId == request.auth.uid &&
+          request.resource.data.senderRole in ['user', 'admin'] &&
+          request.resource.data.text is string && request.resource.data.text.size() > 0 &&
+          request.resource.data.text.size() <= 4000 &&
+          ((request.resource.data.senderRole == 'user' &&
+            isOwner(get(/databases/$(database)/documents/supportTickets/$(ticketId)).data.userId)) ||
+           (request.resource.data.senderRole == 'admin' &&
+            get(/databases/$(database)/documents/supportTickets/$(ticketId)).data.assignedAdminId == request.auth.uid));
+        allow update: if isAdmin() || isOwner(get(/databases/$(database)/documents/supportTickets/$(ticketId)).data.userId);
+        allow delete: if false;
+      }
     }
 
     match /problemReports/{reportId} {
