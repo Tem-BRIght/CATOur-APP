@@ -92,7 +92,7 @@ export type NotifType =
   | 'system'
   | 'visit'
   | 'reply'
-  | 'destination';
+  | 'destination'
   | 'new_message';
 
 export interface AppNotification {

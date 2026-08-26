@@ -32,6 +32,7 @@ import { getUserProfile } from '../../../services/userProfileService';
 import { notifyReviewReply } from '../../../services/notificationsService';
 import { useUserLocation } from '../../../services/useUserLocation';
 import { formatDistance as haversineFormatDistance, haversineKm } from '../../../services/distance';
+import { getProfilePicCache } from '../../../utils/profileImageStorage';
 import './DestinationDetail.css';
 import WriteReviewModal from './writeReview/WriteReviewModal';
 import { Share } from '@capacitor/share';
@@ -135,6 +136,23 @@ const DestinationDetail: React.FC = () => {
   const [computedNearby,  setComputedNearby]  = useState<Destination[]>([]);
   const [destinationTourTypes, setDestinationTourTypes] = useState<TourTypeWithSchedules[]>([]);
   const [destinationTourTypesLoading, setDestinationTourTypesLoading] = useState(false);
+
+  useEffect(() => {
+    if (!user?.uid) return;
+
+    getUserProfile(user.uid)
+      .then(profile => {
+        if (!profile) return;
+        setUserProfileMap(prev => ({
+          ...prev,
+          [user.uid]: {
+            name: [profile.name?.firstname, profile.name?.surname].filter(Boolean).join(' ') || profile.nickname || undefined,
+            img: profile.img || undefined,
+          },
+        }));
+      })
+      .catch(() => {});
+  }, [user?.uid]);
 
   // ── Load destination if not in router state (also handles QR scan) ────────
   useEffect(() => {
@@ -608,11 +626,11 @@ const DestinationDetail: React.FC = () => {
       const newReply: ReviewReply = {
         authorName: resolvedName,
         userId:     user.uid,
-        avatar:     resolvedAvatar || undefined,
         text:       state.text.trim(),
         createdAt:  new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }),
         isVenue:    false,
       };
+      if (resolvedAvatar) newReply.avatar = resolvedAvatar;
 
       const existingReviewDoc = await firestoreGetDoc(reviewRef);
       if (existingReviewDoc.exists()) {
@@ -1285,11 +1303,15 @@ const DestinationDetail: React.FC = () => {
                           {(rev.replies || []).map((reply, ri) => (
                             <div key={ri} className="dd-reply-item">
                               <div className="dd-reply-avatar">
-                                {reply.avatar ? (
-                                  <img src={reply.avatar} alt={reply.authorName} onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }} />
+                                {(() => {
+                                  const profileAvatar = reply.userId ? userProfileMap[reply.userId]?.img : undefined;
+                                  const displayAvatar = profileAvatar || reply.avatar || (reply.userId === user?.uid ? getProfilePicCache() : null);
+                                  return displayAvatar ? (
+                                  <img src={displayAvatar} alt={reply.authorName} onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }} />
                                 ) : (
                                   <span>{reply.authorName?.[0]?.toUpperCase() || 'U'}</span>
-                                )}
+                                  );
+                                })()}
                               </div>
                               <div className="dd-reply-body">
                                 <div className="dd-reply-header">
@@ -1344,10 +1366,14 @@ const DestinationDetail: React.FC = () => {
                       {replyState.open && (
                         <div className="dd-reply-compose">
                           <div className="dd-reply-compose-avatar">
-                            {user?.photoURL
-                              ? <img src={user.photoURL} alt="You" />
-                              : <span>{(user?.displayName || 'Y')[0].toUpperCase()}</span>
-                            }
+                            {(() => {
+                              const profile = user?.uid ? userProfileMap[user.uid] : undefined;
+                              const displayAvatar = profile?.img || user?.photoURL || getProfilePicCache();
+                              const displayName = profile?.name || user?.displayName || 'You';
+                              return displayAvatar
+                                ? <img src={displayAvatar} alt={displayName} />
+                                : <span>{displayName[0].toUpperCase()}</span>;
+                            })()}
                           </div>
                           <div className="dd-reply-compose-right">
                             <textarea

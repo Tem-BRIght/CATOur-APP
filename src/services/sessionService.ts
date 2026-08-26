@@ -26,7 +26,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import {
-  collection, doc, getDoc, setDoc, updateDoc, addDoc, arrayUnion,
+  collection, doc, getDoc, setDoc, updateDoc, deleteDoc, addDoc, arrayUnion,
   onSnapshot, serverTimestamp, Unsubscribe,
   query, where, getDocs, runTransaction,
   Timestamp,
@@ -560,6 +560,25 @@ export async function markStopVisited(sessionId: string, stopId: string): Promis
       visitedStops: arrayUnion(visitedStop),
     });
 
+    // One deterministic visit per scanned tourist and destination. This is
+    // what feeds Admin -> Tours visits without double-counting re-renders or
+    // repeated taps on the same stop.
+    await Promise.all(visitedStop.tourists
+      .filter((tourist) => !!tourist.uid)
+      .map((tourist) => setDoc(
+        doc(firestore, 'visits', `${sessionId}__${stopId}__${tourist.uid}`),
+        {
+          sessionId,
+          userId: tourist.uid,
+          visitorId: tourist.uid,
+          destinationId: stopId,
+          destinationTop: visitedStop.destinationName,
+          scannedAt: visitedStop.visitedAt,
+          visitSource: 'tour-session',
+        },
+        { merge: true }
+      )));
+
     await addDoc(collection(firestore, 'activityLog'), {
       type: 'checkin',
       title: `Destination visited: ${visitedStop.destinationName}`,
@@ -595,6 +614,13 @@ export async function unmarkStopVisited(sessionId: string, stopId: string): Prom
     completedStops: remaining,
     visitedStops: remainingVisitedStops,
   });
+
+  const tourists = data.tourists || [];
+  await Promise.all(tourists
+    .filter((tourist) => !!tourist.uid)
+    .map((tourist) => deleteDoc(
+      doc(firestore, 'visits', `${sessionId}__${stopId}__${tourist.uid}`)
+    )));
 }
 
 // ── Read operations ──────────────────────────────────────────────────────────

@@ -116,6 +116,7 @@ const TourStopsMap: React.FC<{
             <MarkerF
               key={stop.id || `${stop.name}-${i}`}
               position={{ lat: stop.lat, lng: stop.lng }}
+              label={{ text: String(i + 1), color: '#ffffff', fontWeight: '700' }}
               title={stop.name}
             />
           ))}
@@ -220,8 +221,11 @@ const TourSession: React.FC = () => {
         );
         if (cancelled) return;
 
-        const stops: TourStop[] = destsSnap.docs
+        const destinationById = new Map(destsSnap.docs.map((d) => [d.id, d]));
+        const stops: TourStop[] = destIds
+          .map((destinationId) => destinationById.get(destinationId))
           .map((d) => {
+            if (!d) return null;
             const data = d.data() as any;
             const coords = resolveCoords(data);
             if (!coords) return null;

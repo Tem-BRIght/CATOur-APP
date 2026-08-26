@@ -87,9 +87,20 @@ service cloud.firestore {
 
     match /destinations/{destinationId}/reviews/{reviewId} {
       allow read: if true;
-      allow create, update: if isOwner(reviewId) &&
+      allow create: if isOwner(reviewId) &&
         request.resource.data.userId == request.auth.uid &&
         request.resource.data.destinationId == destinationId;
+      allow update: if isOwner(reviewId) &&
+        request.resource.data.userId == request.auth.uid &&
+        request.resource.data.destinationId == destinationId;
+      allow update: if isSignedIn() &&
+        resource.data.allowVenueReply == true &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['replies']) &&
+        request.resource.data.replies is list &&
+        ((!('replies' in resource.data) && request.resource.data.replies.size() == 1) ||
+         (resource.data.replies is list &&
+          request.resource.data.replies.size() == resource.data.replies.size() + 1)) &&
+        request.resource.data.replies[request.resource.data.replies.size() - 1].userId == request.auth.uid;
       allow delete: if isOwner(reviewId);
     }
 
@@ -247,10 +258,18 @@ service cloud.firestore {
     match /supportTickets/{ticketId} {
       allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
       allow read: if isAdmin() || isOwner(resource.data.userId);
-      allow update: if isAdmin() || (isOwner(resource.data.userId) &&
+      allow update: if (isAdmin() &&
         request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-          'lastMessage', 'lastMessageAt', 'unreadByUser', 'status'
-        ]));
+          'assignedAdminId', 'assignedAdminName', 'lastMessage', 'lastMessageAt',
+          'unreadByAdmin', 'unreadByUser', 'status'
+        ]) &&
+        (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['assignedAdminId', 'assignedAdminName']) ||
+         (resource.data.assignedAdminId == null && request.resource.data.assignedAdminId == request.auth.uid) ||
+         (resource.data.assignedAdminId == request.auth.uid && request.resource.data.assignedAdminId == resource.data.assignedAdminId))) ||
+        (isOwner(resource.data.userId) &&
+         request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+           'lastMessage', 'lastMessageAt', 'unreadByUser', 'status'
+         ]));
       allow delete: if isSuperAdmin() || isOwner(resource.data.userId);
 
       match /messages/{messageId} {

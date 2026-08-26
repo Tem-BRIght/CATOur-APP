@@ -96,7 +96,16 @@ const TourGuideFeedback: React.FC = () => {
           if (already) {
             const feedback = await getFeedback(sessionId, currentUser.uid);
             if (feedback) {
-              setSavedFeedback(feedback as typeof savedFeedback);
+              const feedbackData = feedback as unknown as {
+                rating?: unknown;
+                categoryRatings?: unknown;
+                comment?: unknown;
+              };
+              setSavedFeedback({
+                rating: typeof feedbackData.rating === 'number' ? feedbackData.rating : 0,
+                categoryRatings: feedbackData.categoryRatings as Partial<Record<CategoryKey, number>> | undefined,
+                comment: typeof feedbackData.comment === 'string' ? feedbackData.comment : undefined,
+              });
             }
           }
         }

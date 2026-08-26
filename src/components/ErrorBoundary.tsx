@@ -29,8 +29,8 @@ class ErrorBoundary extends Component<Props, State> {
               <IonButton onClick={() => this.setState({ hasError: false, error: null })}>
                 Try Again
               </IonButton>
-              <IonButton fill="outline" onClick={() => window.location.replace('/home')}>
-                Go Home
+              <IonButton fill="outline" onClick={() => window.location.replace('/splash')}>
+                Restart
               </IonButton>
             </div>
           </IonContent>

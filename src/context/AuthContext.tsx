@@ -14,6 +14,7 @@ interface AuthState {
   role:               UserRole;
   status:             string | null;
   mustChangePassword: boolean;
+  authError:         boolean;
   isAuthenticated:    boolean;
   authLoading:        boolean;
   isLoading:          boolean;
@@ -47,6 +48,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     role:               null,
     status:             null,
     mustChangePassword: false,
+    authError:         false,
     isAuthenticated:    false,
     authLoading:        true,
     isLoading:          true,
@@ -62,6 +64,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           role:               null,
           status:             null,
           mustChangePassword: false,
+          authError:         false,
           isAuthenticated:    false,
           authLoading:        false,
           isLoading:          false,
@@ -87,12 +90,17 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           status = typeof guideSnap.data()?.status === 'string' ? guideSnap.data().status : 'online';
         }
 
+        const resolvedMustChangePassword = !userRole && guideSnap.exists()
+          ? guideSnap.data()?.mustChangePassword === true
+          : mustChangePassword;
+
         setState({
           currentUser:        user,
           user:               user,
           role:               nextRole,
           status:             status,
-          mustChangePassword: mustChangePassword,
+          mustChangePassword: resolvedMustChangePassword,
+          authError:         false,
           isAuthenticated:    true,
           authLoading:        false,
           isLoading:          false,
@@ -103,9 +111,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         setState({
           currentUser:        user,
           user:               user,
-          role:               'user',
-          status:             'active',
+          role:               null,
+          status:             null,
           mustChangePassword: false,
+          authError:         true,
           isAuthenticated:    true,
           authLoading:        false,
           isLoading:          false,

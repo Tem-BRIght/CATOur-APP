@@ -6,21 +6,21 @@ import './SplashScreen.css';
 
 const SplashScreen: React.FC = () => {
   const history = useHistory();
-  const { isAuthenticated, authLoading, role, mustChangePassword } = useAuth();
+  const { isAuthenticated, authLoading, authError, role, mustChangePassword } = useAuth();
 
   useEffect(() => {
     // Do not make a routing decision until the authenticated user's role has
     // been loaded from Firestore.
     if (authLoading) return;
 
-    const destination = !isAuthenticated
+    const destination = !isAuthenticated || authError || !role
       ? '/login'
       : role === 'tourguide'
         ? (mustChangePassword ? '/tourguide/change-password' : '/tourguide/home')
         : '/home';
 
     history.replace(destination);
-  }, [authLoading, history, isAuthenticated, mustChangePassword, role]);
+  }, [authError, authLoading, history, isAuthenticated, mustChangePassword, role]);
 
   return (
   <IonPage>

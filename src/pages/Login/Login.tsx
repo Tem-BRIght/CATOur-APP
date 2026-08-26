@@ -81,8 +81,12 @@ const resolveHomeRoute = async (uid: string): Promise<RouteResult> => {
     // 4. Default to tourist home
     return { ok: true, path: '/home' };
   } catch (error) {
-    console.warn('[Login] resolveHomeRoute error, defaulting to /home', error);
-    return { ok: true, path: '/home' };
+    console.warn('[Login] Unable to resolve role for post-login routing', error);
+    return {
+      ok: false,
+      header: 'Unable to verify account',
+      message: 'We could not verify your account role. Please try again.',
+    };
   }
 };
 

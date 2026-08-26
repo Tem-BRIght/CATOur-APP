@@ -8,6 +8,7 @@ import {
 } from '@ionic/react';
 import { IonReactRouter } from '@ionic/react-router';
 import { AuthProvider } from './context/AuthContext';
+import { useAuth, UserRole } from './context/AuthContext';
 import { SignupProvider } from './context/SignupContext';
 // ── Splash ────────────────────────────────────────────────────────────────────
 import SplashScreen      from './pages/Splash/SplashScreen';
@@ -100,6 +101,36 @@ import ErrorBoundary from './components/ErrorBoundary';
 
 setupIonicReact();
 
+interface ProtectedRouteProps {
+  component: React.ComponentType<any>;
+  allowedRole: Exclude<UserRole, null>;
+  [key: string]: any;
+}
+
+const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
+  component: Component,
+  allowedRole,
+  ...routeProps
+}) => {
+  const { authLoading, authError, isAuthenticated, mustChangePassword, role } = useAuth();
+
+  return (
+    <Route
+      {...routeProps}
+      render={props => {
+        if (authLoading) return <Redirect to="/splash" />;
+        if (!isAuthenticated || authError || !role) return <Redirect to="/login" />;
+        if (role !== allowedRole) {
+          return <Redirect to={role === 'tourguide'
+            ? (mustChangePassword ? '/tourguide/change-password' : '/tourguide/home')
+            : '/home'} />;
+        }
+        return <Component {...props} />;
+      }}
+    />
+  );
+};
+
 const App: React.FC = () => {
   useEffect(() => {
     try {
@@ -138,46 +169,46 @@ const App: React.FC = () => {
             <Route exact path="/googleUser"     component={GoogleUserProfile} />
             
             {/* ── Main app ──────────────────────────────────────────────────── */}
-            <Route exact path="/home"           component={Home}              />
-            <Route exact path="/popular"        component={PopularAll}        />
-            <Route exact path="/recommended"    component={RecommendedAll}    />
-            <Route exact path="/notifications"  component={Notifications}     />
-            <Route exact path="/maps"           component={MapPage}           />
-            <Route path="/destination/:id"      component={DestinationDetail} />
+            <ProtectedRoute exact path="/home"           component={Home}              allowedRole="user" />
+            <ProtectedRoute exact path="/popular"        component={PopularAll}        allowedRole="user" />
+            <ProtectedRoute exact path="/recommended"    component={RecommendedAll}    allowedRole="user" />
+            <ProtectedRoute exact path="/notifications"  component={Notifications}     allowedRole="user" />
+            <ProtectedRoute exact path="/maps"           component={MapPage}           allowedRole="user" />
+            <ProtectedRoute path="/destination/:id"      component={DestinationDetail} allowedRole="user" />
             
-            <Route exact path="/ai-guide"       component={AIGuide}           />
+            <ProtectedRoute exact path="/ai-guide"       component={AIGuide}           allowedRole="user" />
 
             {/* ── Settings ──────────────────────────────────────────────────── */}
-            <Route exact path="/settings"       component={Settings}          />
-            <Route exact path="/profile"        component={Profile}           />
-            <Route exact path="/favorites"      component={Favorites}         />
-            <Route exact path="/my-reviews"     component={MyReviews}         />
-            <Route exact path="/tour"           component={BookingHistory}    />
-            <Route exact path="/scan"           component={Scan}              />
-            <Route exact path="/settings/verify-email" component={VerifyEmail} />
-            <Route exact path="/settings/verify-phone" component={VerifyPhone} />
-            <Route exact path="/settings/about" component={About}             />
-            <Route exact path="/settings/permissions" component={Permissions} />
-            <Route exact path="/settings/help"  component={Help}              />
-            <Route exact path="/settings/report-problem" component={ReportProblem}     />
-            <Route exact path="/settings/contact-support" component={ContactSupport}   />
-            <Route exact path="/settings/terms"          component={Terms}             />
+            <ProtectedRoute exact path="/settings"       component={Settings}          allowedRole="user" />
+            <ProtectedRoute exact path="/profile"        component={Profile}           allowedRole="user" />
+            <ProtectedRoute exact path="/favorites"      component={Favorites}         allowedRole="user" />
+            <ProtectedRoute exact path="/my-reviews"     component={MyReviews}         allowedRole="user" />
+            <ProtectedRoute exact path="/tour"           component={BookingHistory}    allowedRole="user" />
+            <ProtectedRoute exact path="/scan"           component={Scan}              allowedRole="user" />
+            <ProtectedRoute exact path="/settings/verify-email" component={VerifyEmail} allowedRole="user" />
+            <ProtectedRoute exact path="/settings/verify-phone" component={VerifyPhone} allowedRole="user" />
+            <ProtectedRoute exact path="/settings/about" component={About}             allowedRole="user" />
+            <ProtectedRoute exact path="/settings/permissions" component={Permissions} allowedRole="user" />
+            <ProtectedRoute exact path="/settings/help"  component={Help}              allowedRole="user" />
+            <ProtectedRoute exact path="/settings/report-problem" component={ReportProblem} allowedRole="user" />
+            <ProtectedRoute exact path="/settings/contact-support" component={ContactSupport} allowedRole="user" />
+            <ProtectedRoute exact path="/settings/terms"          component={Terms}             allowedRole="user" />
 
             {/* ── Destination detail ────────────────────────────────────────── */}
 
             
             {/* ── Tourguide ─────────────────────────────────────────────────── */}
-            <Route exact path="/tourguide/home"            component={TourGuideHome}     />
-            <Route exact path="/tourguide/profile"         component={TourGuideProfile}  />
-            <Route exact path="/tourguide/history"         component={TourGuideHistory}  />
-            <Route exact path="/tourguide/list/:sessionId?" component={TourGuideList}     />
-            <Route exact path="/feedback-qr/:sessionId"    component={FeedbackQR}        />
-            <Route exact path="/tourguide/generateQR"      component={GenerateQR}        />
-            <Route exact path="/tourguide/change-password" component={TouristChangepass} />
-            <Route exact path="/tourguide/analytics"       component={TourGuideAnalytics} />
+            <ProtectedRoute exact path="/tourguide/home"            component={TourGuideHome}     allowedRole="tourguide" />
+            <ProtectedRoute exact path="/tourguide/profile"         component={TourGuideProfile}  allowedRole="tourguide" />
+            <ProtectedRoute exact path="/tourguide/history"         component={TourGuideHistory}  allowedRole="tourguide" />
+            <ProtectedRoute exact path="/tourguide/list/:sessionId?" component={TourGuideList}     allowedRole="tourguide" />
+            <ProtectedRoute exact path="/feedback-qr/:sessionId"    component={FeedbackQR}        allowedRole="tourguide" />
+            <ProtectedRoute exact path="/tourguide/generateQR"      component={GenerateQR}        allowedRole="tourguide" />
+            <ProtectedRoute exact path="/tourguide/change-password" component={TouristChangepass} allowedRole="tourguide" />
+            <ProtectedRoute exact path="/tourguide/analytics"       component={TourGuideAnalytics} allowedRole="tourguide" />
 
             {/* ── Tour Session (tourist view) ────────────────────────────────── */}
-            <Route exact path="/tour-session/:sessionId"   component={TourSession}      />
+            <ProtectedRoute exact path="/tour-session/:sessionId"   component={TourSession}      allowedRole="user" />
             <Route exact path="/feedback/:sessionId"     component={Tourguidefeedback} />
             <Route exact path="/reviews/:sessionId?/:guideId?" component={Reviews} />
 

@@ -287,18 +287,6 @@ const Scan: React.FC = () => {
       setScanResult('success');
       setResultMsg('Joining tour session…');
 
-      // Optional: record a visit (if you still want to track visits separately)
-      try {
-        const userId = auth.currentUser?.uid ?? null;
-        await addDoc(collection(db, 'visits'), {
-          sessionId,
-          scannedAt: new Date().toISOString(),
-          ...(userId ? { userId } : {}),
-        });
-      } catch (err) {
-        console.warn('[Scan] visit record failed (non-fatal):', err);
-      }
-
       // Navigate to the tour session page
       setTimeout(() => router.push(`/tour-session/${sessionId}`, 'forward'), 800);
       return;
