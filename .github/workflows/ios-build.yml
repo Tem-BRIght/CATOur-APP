@@ -1,4 +1,4 @@
- name: iOS Build
+name: iOS Build
 
 on:
   workflow_dispatch:
@@ -26,7 +26,7 @@ jobs:
       - name: Build web app
         run: npm run build
 
-      - name: Add and sync iOS
+      - name: Create and sync iOS project
         run: |
           npx cap add ios
           npx cap sync ios
@@ -38,23 +38,20 @@ jobs:
             -scheme App \
             -configuration Release \
             -sdk iphoneos \
-            -archivePath $PWD/build/App.xcarchive \
+            -archivePath "$PWD/build/CaTour.xcarchive" \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             archive
 
-      - name: Export archive
+      - name: Package unsigned IPA
         run: |
-          mkdir -p build/ipa
-          xcodebuild \
-            -exportArchive \
-            -archivePath $PWD/build/App.xcarchive \
-            -exportPath $PWD/build/ipa \
-            -exportOptionsPlist /dev/null \
-            CODE_SIGNING_ALLOWED=NO
+          mkdir -p build/ipa/Payload
+          cp -R build/CaTour.xcarchive/Products/Applications/App.app build/ipa/Payload/CaTour.app
+          cd build/ipa
+          zip -r CaTour.ipa Payload
 
-      - name: Upload iOS build
+      - name: Upload CaTour IPA artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ios-build
-          path: build/
+          name: CaTour-ipa
+          path: build/ipa/CaTour.ipa
