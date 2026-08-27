@@ -35,6 +35,28 @@ import { firestore } from '../firebase';
 import { createNotification } from './notificationsService';
 import { getUserProfile } from './userProfileService';
 
+function isPermissionDeniedError(error: unknown): boolean {
+  if (!error) return false;
+
+  const code = typeof (error as any)?.code === 'string' ? (error as any).code.toLowerCase() : '';
+  const message = typeof (error as any)?.message === 'string' ? (error as any).message.toLowerCase() : '';
+
+  return code === 'permission-denied'
+    || message.includes('permission denied')
+    || message.includes('missing or insufficient permissions')
+    || message.includes('insufficient permissions');
+}
+
+async function getSessionProfile(uid: string) {
+  try {
+    return await getUserProfile(uid);
+  } catch (error) {
+    // Session records already contain fallback tourist details; private profiles may be unreadable.
+    if (isPermissionDeniedError(error)) return null;
+    throw error;
+  }
+}
+
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 export interface Tourist {
@@ -42,6 +64,9 @@ export interface Tourist {
   name: string;
   email: string;
   joinedAt: string;
+  status?: 'Joined' | 'Checked-In' | 'Cancelled';
+  cancelledAt?: string;
+  cancelReason?: string;
   gender?: string;
   nationality?: string;
   religion?: string;
@@ -59,6 +84,22 @@ export interface VisitedStop {
   tourists: Tourist[];
 }
 
+export interface TourGuideProfile {
+  firstName?: string;
+  lastName?: string;
+  age?: number | string;
+  birthdate?: number | string;
+  dateOfBirth?: string;
+  address?: string;
+  region?: string;
+  city?: string;
+  district?: string;
+  barangay?: string;
+  nationality?: string;
+  photoUrl?: string;
+  img?: string;
+}
+
 export interface TourSession {
   id: string;
   destinationId: string;
@@ -69,6 +110,7 @@ export interface TourSession {
   guideId: string;
   guideName: string;
   guidePhotoUrl?: string;
+  guideProfile?: TourGuideProfile;
   startTime: string;        // ISO string
   endTime?: string;
   tourists: Tourist[];
@@ -79,6 +121,8 @@ export interface TourSession {
   // single query, no matter whether they joined via Check Availability
   // (joinTour) or by scanning the guide's QR (addTouristToSession).
   touristUids?: string[];
+  cancelledUids?: string[];
+  checkedInUids?: string[];
   completedStops?: string[]; // ← stop IDs the guide has marked as visited (shared live with tourists)
   visitedStops?: VisitedStop[]; // Visit records with the tourists in the session at check-in time
   createdAt: string;
@@ -92,6 +136,24 @@ export interface TourSession {
 const sessionsCol = () => collection(firestore, 'sessions');
 const sessionDoc = (sessionId: string) => doc(firestore, 'sessions', sessionId);
 const counterDoc = (year: number) => doc(firestore, 'counters', `tourSessions_${year}`);
+
+async function enrichGuideProfile(session: TourSession): Promise<TourSession> {
+  if (!session.guideId) return session;
+
+  try {
+    const guideSnap = await getDoc(doc(firestore, 'tourGuides', session.guideId));
+    if (guideSnap.exists()) {
+      const guideProfile = guideSnap.data() as TourGuideProfile;
+      session.guideProfile = guideProfile;
+      session.guidePhotoUrl = guideProfile.photoUrl || guideProfile.img || session.guidePhotoUrl;
+      session.guideName = session.guideName || `${guideProfile.firstName || ''} ${guideProfile.lastName || ''}`.trim();
+    }
+  } catch (error) {
+    if (!isPermissionDeniedError(error)) console.warn('[sessionService] guide profile load failed:', error);
+  }
+
+  return session;
+}
 
 // ── Sequential, human-readable ID generation ─────────────────────────────────
 
@@ -155,6 +217,7 @@ export async function createSession(params: {
     endTime: endTime || '',
     tourists: [],
     touristUids: [],
+    checkedInUids: [],
     status: 'pending',
     createdAt: new Date().toISOString(),
   };
@@ -193,16 +256,22 @@ export async function getOrCreateSessionForSlot(params: {
 
   // Combine the Admin-assigned date + time-of-day into a real ISO instant —
   // this is the fix for the "midnight bug" (previously only `date` was used).
-  const startISO = new Date(`${date}T${startTime}:00`).toISOString();
-  const endISO = new Date(`${date}T${endTime}:00`).toISOString();
+  const startDate = new Date(`${date}T${startTime}:00`);
+  const endDate = new Date(`${date}T${endTime}:00`);
+  if (endDate <= startDate) endDate.setDate(endDate.getDate() + 1);
+  const startISO = startDate.toISOString();
+  const endISO = endDate.toISOString();
 
   // Look for an existing session for this exact guide + slot start time.
   const existingSnap = await getDocs(
     query(sessionsCol(), where('guideId', '==', guideId), where('startTime', '==', startISO))
   );
 
-  if (!existingSnap.empty) {
-    const existingDoc = existingSnap.docs[0];
+  const existingDoc = existingSnap.docs.find((candidate) => (
+    (candidate.data() as Partial<TourSession>).status !== 'Cancelled'
+  ));
+
+  if (existingDoc) {
     const existingSession = { id: existingDoc.id, ...existingDoc.data() } as TourSession;
     // CHANGED: keep the admin "Tour Guide Scheduling" booking row in sync
     // even when re-generating for the SAME slot (Refresh QR, remount, etc).
@@ -222,8 +291,9 @@ export async function getOrCreateSessionForSlot(params: {
     guideName,
     startTime: startISO,
     endTime: endISO,
-    tourists: initialTourist ? [initialTourist] : [],
+    tourists: initialTourist ? [{ ...initialTourist, status: 'Joined' as const }] : [],
     touristUids: initialTourist ? [initialTourist.uid] : [],
+    checkedInUids: [],
     status: 'pending',
     createdAt: new Date().toISOString(),
   };
@@ -334,6 +404,9 @@ export function hydrateTouristProfile(
     name: tourist.name || profile?.name?.firstname || profile?.displayName || '',
     email: tourist.email || profile?.email || '',
     joinedAt: tourist.joinedAt || new Date().toISOString(),
+    status: tourist.status,
+    cancelledAt: tourist.cancelledAt,
+    cancelReason: tourist.cancelReason,
     gender: tourist.gender || profile?.gender || '',
     nationality: tourist.nationality || profile?.nationality || '',
     religion: tourist.religion || profile?.religion || '',
@@ -354,29 +427,36 @@ export async function addTouristToSession(
 
   const data = snap.data() as TourSession;
   const currentTourists = data.tourists || [];
-  const profile = tourist.uid ? await getUserProfile(tourist.uid) : null;
+  const profile = tourist.uid ? await getSessionProfile(tourist.uid) : null;
   const hydratedTourist = hydrateTouristProfile(tourist, profile);
+  hydratedTourist.status = 'Joined';
 
   // Check if already in the list
-  const exists = currentTourists.some(t => t.uid === hydratedTourist.uid);
-  if (exists) {
+  const existingTourist = currentTourists.find(t => t.uid === hydratedTourist.uid);
+  if (existingTourist && existingTourist.status !== 'Cancelled') {
     const enriched = await Promise.all(currentTourists.map(async (t) => {
-      const profile = t.uid ? await getUserProfile(t.uid) : null;
+      const profile = t.uid ? await getSessionProfile(t.uid) : null;
       return hydrateTouristProfile(t, profile);
     }));
     return enriched;
   }
 
+  // A cancelled roster entry is retained for the admin audit trail. A fresh
+  // registration gets a new active roster entry and UID registration.
   // Use arrayUnion so this is a single atomic server-side write instead of a
   // client-side read-then-overwrite — two tourists joining at the same
   // moment can no longer clobber each other's write. touristUids is kept in
   // the same write so the two arrays never drift apart — it's what
   // getUserJoinedSessions() queries against.
   try {
-    await updateDoc(ref, {
+    const update: Record<string, unknown> = {
       tourists: arrayUnion(hydratedTourist),
       touristUids: arrayUnion(hydratedTourist.uid),
-    });
+    };
+    if (existingTourist?.status === 'Cancelled') {
+      update.cancelledUids = (data.cancelledUids || []).filter((uid) => uid !== hydratedTourist.uid);
+    }
+    await updateDoc(ref, update);
   } catch (err: any) {
     // Surface permission errors loudly instead of failing silently — if your
     // Firestore rules only allow the guide (owner) to write to sessions/{id},
@@ -391,6 +471,38 @@ export async function addTouristToSession(
   void upsertBookingRecord({ ...data, id: sessionId, tourists: updatedTourists });
 
   return updatedTourists;
+}
+
+export async function checkInTouristToSession(
+  sessionId: string,
+  userId: string,
+): Promise<void> {
+  if (!userId) throw new Error('User not logged in');
+
+  await runTransaction(firestore, async (transaction) => {
+    const ref = sessionDoc(sessionId);
+    const snap = await transaction.get(ref);
+    if (!snap.exists()) throw new Error('Session not found');
+
+    const session = snap.data() as TourSession;
+    if (session.status === 'ended' || session.status === 'Cancelled') {
+      throw new Error('This tour session is no longer active.');
+    }
+    if (!Array.isArray(session.touristUids) || !session.touristUids.includes(userId)
+      || session.cancelledUids?.includes(userId)) {
+      throw new Error('You are not registered for this tour session.');
+    }
+
+    const checkedInUids = Array.isArray(session.checkedInUids) ? session.checkedInUids : [];
+    if (!checkedInUids.includes(userId)) {
+      transaction.update(ref, {
+        checkedInUids: [...checkedInUids, userId],
+        tourists: (session.tourists || []).map((tourist) => tourist.uid === userId && tourist.status !== 'Cancelled'
+          ? { ...tourist, status: 'Checked-In' as const }
+          : tourist),
+      });
+    }
+  });
 }
 
 /**
@@ -498,8 +610,13 @@ export async function cancelJoinedSession(
     if (session.status !== 'pending') {
       throw new Error('This tour can only be cancelled before it starts.');
     }
-    if (!session.touristUids?.includes(userId)) {
+    const tourists = Array.isArray(session.tourists) ? session.tourists : [];
+    const tourist = tourists.find((item) => item.uid === userId);
+    if (!session.touristUids?.includes(userId) || !tourist) {
       throw new Error('You are not joined to this tour.');
+    }
+    if (session.checkedInUids?.includes(userId) || tourist.status === 'Checked-In') {
+      throw new Error('This tour cannot be cancelled after check-in.');
     }
 
     const guideRef = doc(firestore, 'tourGuides', session.guideId);
@@ -518,17 +635,27 @@ export async function cancelJoinedSession(
     const slot = { ...slots[slotIndex] };
     const previousBookedCount = Number(slot.bookedCount ?? slot.sessionCount ?? 0);
     const previousSessionCount = Number(slot.sessionCount ?? previousBookedCount);
+    const hadSlotRegistration = (Array.isArray(slot.joinedUserIds) ? slot.joinedUserIds : [])
+      .includes(userId);
     slot.joinedUserIds = (Array.isArray(slot.joinedUserIds) ? slot.joinedUserIds : [])
       .filter((id: string) => id !== userId);
-    slot.bookedCount = Math.max(0, previousBookedCount - 1);
-    slot.sessionCount = Math.max(0, previousSessionCount - 1);
+    slot.bookedCount = Math.max(0, previousBookedCount - (hadSlotRegistration ? 1 : 0));
+    slot.sessionCount = Math.max(0, previousSessionCount - (hadSlotRegistration ? 1 : 0));
     slots[slotIndex] = slot;
 
     transaction.update(guideRef, { availabilitySlots: slots });
     transaction.update(sessionRef, {
-      status: 'Cancelled',
-      cancelReason: trimmedReason,
-      cancelledAt: new Date().toISOString(),
+      tourists: tourists.map((item) => item.uid === userId
+        ? {
+            ...item,
+            status: 'Cancelled',
+            cancelReason: trimmedReason,
+            cancelledAt: new Date().toISOString(),
+          }
+        : item),
+      touristUids: session.touristUids || [],
+      cancelledUids: arrayUnion(userId),
+      checkedInUids: (session.checkedInUids || []).filter((id) => id !== userId),
     });
   });
 }
@@ -542,60 +669,71 @@ export async function cancelJoinedSession(
  * tourist's TourSession view.
  */
 export async function markStopVisited(sessionId: string, stopId: string): Promise<void> {
-  try {
-    const session = await getSession(sessionId);
-    if (!session) return;
+  const session = await runTransaction(firestore, async (transaction): Promise<TourSession | null> => {
+    const ref = sessionDoc(sessionId);
+    const snap = await transaction.get(ref);
+    if (!snap.exists()) throw new Error('Session not found');
 
-    const stopName = await getStopName(stopId);
-    const visitedStop: VisitedStop = {
-      destinationId: stopId,
-      destinationName: stopName || 'Tour stop',
-      visitedAt: new Date().toISOString(),
-      touristUids: (session.tourists || []).map((tourist) => tourist.uid),
-      tourists: session.tourists || [],
-    };
+    const current = { id: snap.id, ...snap.data() } as TourSession;
+    if (current.status !== 'active') throw new Error('The tour session is not active.');
+    if ((current.completedStops || []).includes(stopId)) return null;
 
-    await updateDoc(sessionDoc(sessionId), {
-      completedStops: arrayUnion(stopId),
-      visitedStops: arrayUnion(visitedStop),
-    });
+    transaction.update(ref, { completedStops: arrayUnion(stopId) });
+    return current;
+  });
+
+  // Another guide tab may have claimed this stop while this transaction was
+  // retrying. Only the transaction winner may create visit analytics.
+  if (!session) return;
+
+  const stopName = await getStopName(stopId);
+  const checkedInUids = Array.isArray(session.checkedInUids) ? session.checkedInUids : [];
+  const checkedInTourists = checkedInUids.length > 0
+    ? (session.tourists || []).filter((tourist) => checkedInUids.includes(tourist.uid))
+    : [];
+  const visitedStop: VisitedStop = {
+    destinationId: stopId,
+    destinationName: stopName || 'Tour stop',
+    visitedAt: new Date().toISOString(),
+    touristUids: checkedInTourists.map((tourist) => tourist.uid),
+    tourists: checkedInTourists,
+  };
+
+  await updateDoc(sessionDoc(sessionId), { visitedStops: arrayUnion(visitedStop) });
 
     // One deterministic visit per scanned tourist and destination. This is
     // what feeds Admin -> Tours visits without double-counting re-renders or
     // repeated taps on the same stop.
-    await Promise.all(visitedStop.tourists
-      .filter((tourist) => !!tourist.uid)
-      .map((tourist) => setDoc(
-        doc(firestore, 'visits', `${sessionId}__${stopId}__${tourist.uid}`),
-        {
-          sessionId,
-          userId: tourist.uid,
-          visitorId: tourist.uid,
-          destinationId: stopId,
-          destinationTop: visitedStop.destinationName,
-          scannedAt: visitedStop.visitedAt,
-          visitSource: 'tour-session',
-        },
-        { merge: true }
-      )));
-
-    await addDoc(collection(firestore, 'activityLog'), {
-      type: 'checkin',
-      title: `Destination visited: ${visitedStop.destinationName}`,
-      sessionId,
-      timestamp: serverTimestamp(),
-      extra: {
+  await Promise.all(visitedStop.tourists
+    .filter((tourist) => !!tourist.uid)
+    .map((tourist) => setDoc(
+      doc(firestore, 'visits', `${sessionId}__${stopId}__${tourist.uid}`),
+      {
+        sessionId,
+        userId: tourist.uid,
+        visitorId: tourist.uid,
         destinationId: stopId,
-        destinationName: visitedStop.destinationName,
-        guideName: session.guideName,
-        tourName: session.destinationName,
-        touristUids: visitedStop.touristUids,
-        touristCount: visitedStop.tourists.length,
+        destinationTop: visitedStop.destinationName,
+        scannedAt: visitedStop.visitedAt,
+        visitSource: 'tour-session',
       },
-    });
-  } catch (err) {
-    console.warn('[sessionService] Failed to write destination activity log:', err);
-  }
+      { merge: true }
+    )));
+
+  await addDoc(collection(firestore, 'activityLog'), {
+    type: 'checkin',
+    title: `Destination visited: ${visitedStop.destinationName}`,
+    sessionId,
+    timestamp: serverTimestamp(),
+    extra: {
+      destinationId: stopId,
+      destinationName: visitedStop.destinationName,
+      guideName: session.guideName,
+      tourName: session.destinationName,
+      touristUids: visitedStop.touristUids,
+      touristCount: visitedStop.tourists.length,
+    },
+  });
 }
 
 /**
@@ -645,9 +783,10 @@ export async function getSession(sessionId: string): Promise<TourSession | null>
 
     if (!sessionData) return null;
     const session = { id: sessionId, ...sessionData } as TourSession;
+    await enrichGuideProfile(session);
     if (Array.isArray(session.tourists)) {
       const enrichedTourists = await Promise.all(session.tourists.map(async (tourist) => {
-        const profile = tourist.uid ? await getUserProfile(tourist.uid) : null;
+        const profile = tourist.uid ? await getSessionProfile(tourist.uid) : null;
         return hydrateTouristProfile(tourist, profile);
       }));
       session.tourists = enrichedTourists;
@@ -685,6 +824,29 @@ function normalizeSlotIsoValue(date: string, timeValue: string | undefined, fall
   if (!date) return '';
   const parsed = new Date(`${date}T${value}:00`);
   return Number.isNaN(parsed.getTime()) ? '' : parsed.toISOString();
+}
+
+function normalizeSessionForViewer(session: TourSession, uid: string): TourSession {
+  const touristByUid = new Map<string, Tourist>();
+  (session.tourists || []).forEach((tourist) => {
+    if (tourist.uid) touristByUid.set(tourist.uid, tourist);
+  });
+  const tourists = Array.from(touristByUid.values());
+  const viewerTourist = tourists.find((tourist) => tourist.uid === uid);
+  const viewerCancelled = session.cancelledUids?.includes(uid)
+    && viewerTourist?.status === 'Cancelled';
+
+  return {
+    ...session,
+    tourists,
+    ...(viewerCancelled
+      ? {
+          status: 'Cancelled' as const,
+          cancelReason: viewerTourist.cancelReason || session.cancelReason,
+          cancelledAt: viewerTourist.cancelledAt || session.cancelledAt,
+        }
+      : {}),
+  };
 }
 
 export function buildJoinedSessionFallbacks(
@@ -752,19 +914,29 @@ export function buildJoinedSessionFallbacks(
 
 export async function getUserJoinedSessions(uid: string): Promise<TourSession[]> {
   try {
-    const [sessionsSnap, guidesSnap] = await Promise.all([
-      // Read the full session list so older sessions that predate the
-      // `touristUids` mirror are still resolved to their real TOUR-* ID.
-      getDocs(sessionsCol()),
+    const [sessionsSnap, guidesSnap, tourTypesSnap] = await Promise.all([
+      // Keep this query scoped to the signed-in tourist so it is allowed by
+      // Firestore rules and matches subscribeUserJoinedSessions().
+      getDocs(query(sessionsCol(), where('touristUids', 'array-contains', uid))),
       getDocs(collection(firestore, 'tourGuides')),
+      getDocs(collection(firestore, 'tourTypes')),
     ]);
 
+    const tourTypeNames = new Map(
+      tourTypesSnap.docs.map((tourTypeDoc) => [
+        tourTypeDoc.id,
+        String(tourTypeDoc.data().name || tourTypeDoc.data().title || ''),
+      ])
+    );
+
     const sessions = sessionsSnap.docs
-      .map((d) => ({ id: d.id, ...d.data() } as TourSession))
-      .filter((session) => (
-        (Array.isArray(session.touristUids) && session.touristUids.includes(uid)) ||
-        (Array.isArray(session.tourists) && session.tourists.some((tourist) => tourist.uid === uid))
-      ));
+      .map((d) => {
+        const session = { id: d.id, ...d.data() } as TourSession;
+        return normalizeSessionForViewer({
+          ...session,
+          tourTypeName: session.tourTypeName || tourTypeNames.get(session.tourTypeId || '') || 'Tour',
+        }, uid);
+      });
 
     sessions.forEach((session) => {
       const guideData = guidesSnap.docs.find((guideDoc) => guideDoc.id === session.guideId)?.data() as any;
@@ -784,7 +956,7 @@ export async function getUserJoinedSessions(uid: string): Promise<TourSession[]>
           destinationId: data.assignedDestId || '',
           destinationName: data.assignedDestName || 'Unknown',
           tourTypeId: data.tourTypeIds?.[0] || '',
-          tourTypeName: 'Tour',
+          tourTypeName: tourTypeNames.get(data.tourTypeIds?.[0] || '') || 'Tour',
           startTime: slot.startTime || '',
           endTime: slot.endTime || '',
           date: slot.date || '',
@@ -813,9 +985,10 @@ export function subscribeSession(
     async (snap) => {
       if (!snap.exists()) { onChange(null); return; }
       const session = { id: snap.id, ...snap.data() } as TourSession;
+      await enrichGuideProfile(session);
       if (Array.isArray(session.tourists)) {
         const enrichedTourists = await Promise.all(session.tourists.map(async (tourist) => {
-          const profile = tourist.uid ? await getUserProfile(tourist.uid) : null;
+          const profile = tourist.uid ? await getSessionProfile(tourist.uid) : null;
           return hydrateTouristProfile(tourist, profile);
         }));
         session.tourists = enrichedTourists;
@@ -823,5 +996,40 @@ export function subscribeSession(
       onChange(session);
     },
     (err) => console.error('[sessionService] subscribeSession error:', err)
+  );
+}
+
+/**
+ * Live tourist history/session state. The session document is the shared
+ * source of truth for guide starts, destination progress, cancellation, and
+ * closure, so the tourist list must not depend on a one-time read.
+ */
+export function subscribeUserJoinedSessions(
+  uid: string,
+  onChange: (sessions: TourSession[]) => void,
+): Unsubscribe {
+  const sessionsQuery = query(sessionsCol(), where('touristUids', 'array-contains', uid));
+  const tourTypeNamesPromise = getDocs(collection(firestore, 'tourTypes'))
+    .then((snap) => new Map(snap.docs.map((tourTypeDoc) => [
+      tourTypeDoc.id,
+      String(tourTypeDoc.data().name || tourTypeDoc.data().title || ''),
+    ])))
+    .catch(() => new Map<string, string>());
+  return onSnapshot(
+    sessionsQuery,
+    async (snap) => {
+      const tourTypeNames = await tourTypeNamesPromise;
+      const sessions = snap.docs
+        .map((item) => {
+          const session = { id: item.id, ...item.data() } as TourSession;
+          return normalizeSessionForViewer({
+            ...session,
+            tourTypeName: session.tourTypeName || tourTypeNames.get(session.tourTypeId || '') || 'Tour',
+          }, uid);
+        })
+        .sort((a, b) => new Date(b.startTime || 0).getTime() - new Date(a.startTime || 0).getTime());
+      onChange(sessions);
+    },
+    (err) => console.error('[sessionService] subscribeUserJoinedSessions error:', err),
   );
 }

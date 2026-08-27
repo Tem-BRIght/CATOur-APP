@@ -37,7 +37,17 @@ import { firestore } from '../../../firebase';
 
 import './ContactSupport.css';
 
+const SUPPORT_CATEGORIES = [
+  { id: 'General Inquiry', label: 'General Inquiry', priority: 'Low', icon: '❓' },
+  { id: 'Tour Booking',    label: 'Tour Booking',    priority: 'Medium', icon: '🗺️' },
+  { id: 'Payment',         label: 'Payment & Fees',  priority: 'High', icon: '💳' },
+  { id: 'Technical Bug',   label: 'Technical Issue', priority: 'Medium', icon: '🛠️' },
+  { id: 'Safety Concern',  label: 'Safety Concern',  priority: 'Urgent', icon: '⚠️' },
+  { id: 'Feedback',        label: 'Feedback',        priority: 'Low', icon: '⭐' },
+];
+
 const ContactSupport: React.FC = () => {
+  const [selectedCategory, setSelectedCategory] = useState('General Inquiry');
   const [message, setMessage] = useState('');
   const [showToast, setShowToast] = useState(false);
   const [toastMsg, setToastMsg] = useState('');
@@ -102,6 +112,7 @@ const ContactSupport: React.FC = () => {
       setSending(true);
 
       const text = message.trim();
+      const catObj = SUPPORT_CATEGORIES.find(c => c.id === selectedCategory) || SUPPORT_CATEGORIES[0];
       const reopening = ticketId && ticketStatus === 'resolved';
       const ticketRef = ticketId
         ? doc(firestore, 'supportTickets', ticketId)
@@ -110,6 +121,8 @@ const ContactSupport: React.FC = () => {
 
       if (reopening) {
         await updateDoc(ticketRef, {
+          category: catObj.id,
+          priority: catObj.priority,
           lastMessage: text,
           lastMessageAt: serverTimestamp(),
           lastMessageBySenderRole: 'user',
@@ -124,6 +137,9 @@ const ContactSupport: React.FC = () => {
           userEmail: user.email || null,
           email: user.email || null,
           userName: user.displayName || user.email?.split('@')[0] || 'Tourist',
+          category: catObj.id,
+          priority: catObj.priority,
+          subject: `${catObj.label}: ${text.slice(0, 50)}${text.length > 50 ? '…' : ''}`,
           message: text,
           lastMessage: text,
           lastMessageAt: serverTimestamp(),
@@ -298,8 +314,24 @@ const ContactSupport: React.FC = () => {
           </div>
         ) : (
           <div className="contact-message-area">
+            <div className="support-category-label">Select Topic:</div>
+            <div className="support-category-chips" role="radiogroup" aria-label="Support Topic">
+              {SUPPORT_CATEGORIES.map(cat => (
+                <button
+                  key={cat.id}
+                  type="button"
+                  className={`support-category-chip${selectedCategory === cat.id ? ' active' : ''}`}
+                  onClick={() => setSelectedCategory(cat.id)}
+                  aria-pressed={selectedCategory === cat.id}
+                >
+                  <span className="support-category-icon">{cat.icon}</span>
+                  <span>{cat.label}</span>
+                </button>
+              ))}
+            </div>
+
             <IonTextarea
-              placeholder="Describe your question or concern…"
+              placeholder="Describe your question or concern in detail…"
               rows={5}
               value={message}
               onIonInput={e => setMessage(e.detail.value ?? '')}

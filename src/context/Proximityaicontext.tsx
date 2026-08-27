@@ -37,6 +37,7 @@ import {
   generateArrivalNarration,
   logProximityTrigger,
   logAIActivity,
+  isArrivalVelocityValid,
   GeofenceDestination,
   TriggerSource,
 } from '../services/proximityAIService';
@@ -49,11 +50,6 @@ import { functions } from '../firebase';
 // the same service proximityAIService.ts's own header comment describes as
 // the shared "GPS geofence + QR check-in" entry point. This file only owns
 // the GPS-watch loop, TTS playback, and the voice Q&A follow-up.
-//
-// ⚠️ Behavior change from the old local cooldown: proximityAIService's
-// RETRIGGER_COOLDOWN_MS is 6 hours (was 45 minutes here before), and it's
-// now persisted in localStorage instead of in-memory — so it survives an
-// app reload instead of resetting every time the app restarts.
 
 interface GroqChatMessage {
   role: 'system' | 'user' | 'assistant';
@@ -75,44 +71,51 @@ const callGroqChat = httpsCallable<GroqChatRequest, GroqChatResponse>(functions,
  * A GPS fix is only trusted for geofencing if the device reports it's
  * accurate to within this many meters. Phones/browsers happily hand back
  * "fixes" from cell-tower or Wi-Fi positioning (accuracy of several hundred
- * meters to a few km) when GPS itself hasn't locked yet — without this
- * check, one of those low-accuracy fixes can land within a destination's
- * geofence radius even while the tourist is genuinely far away, which is
- * why the overlay could fire from across town. We simply ignore fixes we
- * can't trust rather than guessing.
+ * meters to a few km) when GPS itself hasn't locked yet.
  */
 const MAX_ACCEPTABLE_ACCURACY_METERS = 75;
 /** How often we're willing to react to a new GPS fix */
 const MIN_CHECK_INTERVAL_MS = 5000;
 
-/** NEW — system prompt for follow-up questions asked by voice once the tourist is there. */
+/** System prompt for follow-up questions asked by voice or tap once the tourist is there. */
 function buildQASystemPrompt(dest: ProximityDestination): string {
+  const facts: string[] = [`Destination: ${dest.title}`];
+  if (dest.description) facts.push(`Background: ${dest.description}`);
+  if (dest.category) facts.push(`Category: ${dest.category}`);
+  if (dest.hours) facts.push(`Opening Hours: ${dest.hours}`);
+  if (dest.address) facts.push(`Address: ${dest.address}`);
+
   return (
-    'You are ALI, a friendly, professional AI tour guide currently standing with a tourist at ' +
-    `"${dest.title}" in Pasig City, Philippines. ` +
-    (dest.description ? `Verified background on this spot: ${dest.description} ` : 
-      'No verified background details are available for this spot beyond its name. ') +
-    'Only state facts that come from the background above or from what the tourist tells you — ' +
-    'never invent history, hours, prices, or other details you were not given; if you don\'t know ' +
-    'something, say so plainly instead of guessing. ' +
-    'The tourist just asked you something out loud, in person, about where they are ' +
-    'standing right now. Answer naturally in Taglish, like a real guide would — ' +
-    'warm, concise (1-3 sentences), and directly about this location or what\'s nearby less meters from the tourist. ' +
-    'Respond in the same language the tourist used (English, Tagalog, or a mix). ' +
-    'Do not use markdown, numbered lists, or headings — this gets read aloud.'
+    'You are ALI, the official AI Tour Guide for the CATOUR app, speaking directly to a tourist standing in person at ' +
+    `"${dest.title}" in Pasig City, Philippines.\n\n` +
+    `Verified details:\n${facts.join('\n')}\n\n` +
+    'Response Rules:\n' +
+    '1. Answer immediately and directly — lead with the answer first, then add 1-2 sentences of helpful practical context (what to see/do, best time, standout feature).\n' +
+    '2. Keep answers short: 1 to 3 natural spoken sentences. The tourist is listening out loud on their phone outdoors.\n' +
+    '3. Tone: Warm, friendly, knowledgeable local guide who lives in Pasig City.\n' +
+    '4. Knowledge Scope: Help with opening hours, fees, nearest food/restrooms, resting benches, bike paths, etiquette, or safety when asked.\n' +
+    '5. Location Accuracy: Ground all details strictly in Pasig City, Philippines. Never mix up or substitute places from other cities.\n' +
+    '6. Handling Uncertainty: Never give flat refusals. If a live price or holiday schedule is unconfirmed, state so politely and advise checking posted on-site signage or suggest nearby verified spots.\n' +
+    '7. Voice Clarification: If speech input was unclear or sounds like a misheard landmark name, ask a quick clarifying question (e.g. "Did you mean [closest match]?").\n' +
+    '8. Language: Match the tourist\'s language (English, Tagalog, or natural Taglish).\n' +
+    '9. Format: Plain spoken sentences only. STRICTLY NO markdown, asterisks, bullet points, or headings.'
   );
 }
 
 function buildGenericQASystemPrompt(): string {
   return (
-    'You are ALI, a warm and knowledgeable AI tour guide for Pasig City, Philippines. ' +
-    'The tourist is not asking about a specific destination right now, but they want to talk about ' +
-    'anything they are curious about — Pasig City, nearby attractions, transport, culture, ' +
-    'or whatever they want to discuss. Answer naturally in Taglish, like a real guide would — ' +
-    'warm, concise (1-3 sentences), and helpful. Keep your response grounded in general city ' +
-    'knowledge and what the tourist says. If they ask for directions, answer in a high-level way ' +
-    'based on Pasig and nearby areas without inventing exact route details. Do not invent prices, hours, ' +
-    'or facts you are not sure about. Do not use markdown, lists, or headings.'
+    'You are ALI, the warm and knowledgeable AI Tour Guide for the CATOUR app in Pasig City, Philippines.\n' +
+    'You are speaking out loud to a tourist who is exploring Pasig City.\n\n' +
+    'Response Rules:\n' +
+    '1. Answer immediately and directly — lead with the answer first, then add 1-2 sentences of context.\n' +
+    '2. Keep answers short: 1 to 3 natural spoken sentences.\n' +
+    '3. Tone: Warm, friendly, knowledgeable local guide.\n' +
+    '4. Knowledge Scope: Recommend tourist attractions, food spots (Kapitolyo, Mega Market), resting spots (Plaza Rizal, Rainforest Park, Capitol Commons), and bike-friendly routes (Emerald Ave, linear parks) in Pasig City.\n' +
+    '5. Location Accuracy: Strictly ground in Pasig City, Philippines. Never discuss or mix up other cities.\n' +
+    '6. Depth & Uncertainty: Highlight what visitors can see/do and why to visit. If data on a specific spot is limited, acknowledge it politely and pivot to the closest known options nearby.\n' +
+    '7. Voice Clarification: If speech input was unclear, ask a quick clarifying question rather than guessing.\n' +
+    '8. Language: Match the tourist\'s language (English, Tagalog, or Taglish).\n' +
+    '9. Format: Plain spoken sentences only. STRICTLY NO markdown, asterisks, bullet points, or headings.'
   );
 }
 
@@ -368,7 +371,12 @@ export const ProximityAIProvider: React.FC<{ children: React.ReactNode }> = ({ c
         // Only look for a new trigger when nothing is currently active
         if (activeIdRef.current !== null) return;
 
-        const { latitude, longitude, accuracy } = pos.coords;
+        const { latitude, longitude, accuracy, speed } = pos.coords;
+
+        // Ignore fixes while traveling at high vehicle speeds (> 60 km/h)
+        if (!isArrivalVelocityValid(speed)) {
+          return;
+        }
 
         // Don't trust low-accuracy fixes (e.g. cell/Wi-Fi positioning while
         // GPS hasn't locked yet) for a geofence this tight — a fix reported

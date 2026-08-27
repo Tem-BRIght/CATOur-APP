@@ -20,8 +20,14 @@ const GROQ_API_KEY = defineSecret('GROQ_API_KEY');
 const GROQ_API_ENDPOINT = process.env.GROQ_API_ENDPOINT?.trim() || 'https://api.groq.com/openai/v1/chat/completions';
 const GROQ_API_ENDPOINT_SOURCE = process.env.GROQ_API_ENDPOINT ? 'env' : 'default';
 const DEFAULT_MODEL = process.env.GROQ_MODEL?.trim() || 'llama-3.3-70b-versatile';
-const FALLBACK_MODELS = ['openai/gpt-oss-20b', 'openai/gpt-oss-120b'];
-const MAX_TOKENS_CAP = 600;
+const FALLBACK_MODELS = [
+  'llama-3.1-8b-instant',
+  'llama3-70b-8192',
+  'llama3-8b-8192',
+  'gemma2-9b-it',
+  'mixtral-8x7b-32768',
+];
+const MAX_TOKENS_CAP = 1024;
 const ALLOWED_ROLES = new Set(['system', 'user', 'assistant']);
 
 if (getApps().length === 0) {
@@ -530,7 +536,7 @@ export const getUserAuth = onCall<{ targetUid: string }, Promise<{ emailVerified
 );
 
 export const permanentlyDeleteScheduledUsers = onSchedule(
-  { schedule: 'every day 03:00', timeZone: 'Asia/Manila', region: 'us-central1' },
+  { schedule: 'every 1 minutes', timeZone: 'Asia/Manila', region: 'us-central1' },
   async () => {
     const now = new Date();
     const due = await firestore.collection('users')

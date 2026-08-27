@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useHistory } from 'react-router-dom';
 import {
   IonContent, IonPage, IonButton, IonInput,
-  IonItem, IonLabel, IonIcon, IonLoading, IonAlert,
+  IonItem, IonLabel, IonIcon, IonLoading,
   IonToolbar, IonButtons, IonBackButton,
 } from '@ionic/react';
 import { lockClosedOutline, mailOutline } from 'ionicons/icons';
@@ -13,6 +13,7 @@ import {
 } from 'firebase/auth';
 import { auth, getAuthActionCodeSettings } from '../../firebase';
 import './reset-password.css';
+import FeedbackOverlay from '../../components/FeedbackOverlay';
 
 const ResetPassword: React.FC = () => {
   const history = useHistory();
@@ -228,7 +229,7 @@ const ResetPassword: React.FC = () => {
 
         <IonLoading isOpen={showLoading} message="Sending reset link..." />
 
-        <IonAlert
+        <FeedbackOverlay
           isOpen={showAlert}
           onDidDismiss={handleAlertDismiss}
           header={alertHeader}

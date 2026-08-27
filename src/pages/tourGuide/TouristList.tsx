@@ -39,15 +39,9 @@ import type { TourSession, Tourist } from '../../services/sessionService';
 import { getOrCreateChat, sendMessage, subscribeMessages, ChatMessage } from '../../services/chatService';
 import { collection, doc, getDoc, getDocs, documentId, orderBy, query, where, setDoc, serverTimestamp } from 'firebase/firestore';
 import { firestore } from '../../firebase';
+import { DirectionsRenderer, LoadScript, GoogleMap, MarkerF } from '@react-google-maps/api';
+import { useUserLocation } from '../../services/useUserLocation';
 import './TouristList.css';
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Inlined below (no separate component/util files needed):
-//   - resolveCoords()  — pulls { lat, lng } out of a destination doc
-//   - TourStop         — shape used by the map
-//   - TourStopsMap      — Google Maps map showing one pin per stop
-// ─────────────────────────────────────────────────────────────────────────────
-import { LoadScript, GoogleMap, MarkerF } from '@react-google-maps/api';
 
 const resolveCoords = (dest: any): { lat: number; lng: number } | null => {
   const lat =
@@ -78,8 +72,15 @@ interface LiveLatLng {
   lng: number;
 }
 
-const TourStopsMap: React.FC<{ stops: TourStop[]; guideLocation?: LiveLatLng | null; height?: number }> = ({ stops, guideLocation, height = 200 }) => {
+const TourStopsMap: React.FC<{
+  stops: TourStop[];
+  guideLocation?: LiveLatLng | null;
+  routeOrigin?: LiveLatLng | null;
+  routeDestination?: LiveLatLng | null;
+  height?: number;
+}> = ({ stops, guideLocation, routeOrigin, routeDestination, height = 200 }) => {
   const mapRef = useRef<google.maps.Map | null>(null);
+  const [directions, setDirections] = useState<google.maps.DirectionsResult | null>(null);
   const points = [
     ...stops.map((stop) => ({ lat: stop.lat, lng: stop.lng })),
     ...(guideLocation ? [guideLocation] : []),
@@ -109,6 +110,25 @@ const TourStopsMap: React.FC<{ stops: TourStop[]; guideLocation?: LiveLatLng | n
   };
 
   useEffect(() => {
+    if (!routeOrigin || !routeDestination || !window.google?.maps) {
+      setDirections(null);
+      return;
+    }
+
+    new google.maps.DirectionsService().route(
+      {
+        origin: routeOrigin,
+        destination: routeDestination,
+        travelMode: google.maps.TravelMode.WALKING,
+      },
+      (result, status) => {
+        if (status === google.maps.DirectionsStatus.OK && result) setDirections(result);
+        else setDirections(null);
+      }
+    );
+  }, [routeOrigin?.lat, routeOrigin?.lng, routeDestination?.lat, routeDestination?.lng]);
+
+  useEffect(() => {
     fitMapToPoints();
   }, [points.map((point) => `${point.lat.toFixed(5)}:${point.lng.toFixed(5)}`).join('|')]);
 
@@ -128,6 +148,7 @@ const TourStopsMap: React.FC<{ stops: TourStop[]; guideLocation?: LiveLatLng | n
           }}
           onLoad={handleMapLoad}
         >
+          {directions && <DirectionsRenderer directions={directions} options={{ suppressMarkers: true }} />}
           {stops.map((stop, i) => (
             <MarkerF
               key={stop.id || `${stop.name}-${i}`}
@@ -160,6 +181,7 @@ const TouristList: React.FC = () => {
   const history = useHistory();
   const { sessionId } = useParams<{ sessionId?: string }>();
   const { currentUser } = useAuth();
+  const { coords: guideCoords } = useUserLocation();
   const [searchText, setSearchText] = useState('');
   const [selectedTourist, setSelectedTourist] = useState<Tourist | null>(null);
   const [showModal, setShowModal] = useState(false);
@@ -255,26 +277,20 @@ const TouristList: React.FC = () => {
     return () => { cancelled = true; };
   }, [sessionId, currentUser?.uid]);
 
-  // ── Resolve Type(s) of Tour assigned to this guide ──────────
+  // ── Resolve the destination sequence for this session ──────
   useEffect(() => {
-    const guideId = session?.guideId;
-    if (!guideId) {
+    const tourTypeId = session?.tourTypeId;
+    if (!tourTypeId) {
       setTourTypeNames([]);
+      setTourStops([]);
       return;
     }
 
     let cancelled = false;
     const loadTourTypes = async () => {
       try {
-        const guideSnap = await getDoc(doc(firestore, 'tourGuides', guideId));
-        if (cancelled) return;
-        if (!guideSnap.exists()) { setTourTypeNames([]); return; }
-
-        const tourTypeIds: string[] = (guideSnap.data() as any)?.tourTypeIds || [];
-        if (tourTypeIds.length === 0) { setTourTypeNames([]); return; }
-
         const typesSnap = await getDocs(
-          query(collection(firestore, 'tourTypes'), where(documentId(), 'in', tourTypeIds.slice(0, 30)))
+          query(collection(firestore, 'tourTypes'), where(documentId(), 'in', [tourTypeId]))
         );
         if (cancelled) return;
 
@@ -320,7 +336,7 @@ const TouristList: React.FC = () => {
 
     loadTourTypes();
     return () => { cancelled = true; };
-  }, [session?.guideId]);
+  }, [session?.tourTypeId]);
 
   useEffect(() => {
     if (!session || session.status !== 'ended') {
@@ -626,34 +642,50 @@ const TouristList: React.FC = () => {
               </div>
             </div>
 
-            {tourStops.length > 0 && (
-              <div className="stops-card">
-                <TourStopsMap stops={tourStops} />
-                <div className="stops-heading">
-                  Tour Type: <span>{session?.tourTypeName || tourTypeNames.join(', ')}</span>
+            {tourStops.length > 0 && (() => {
+              const nextStop = tourStops.find((stop) => !(session?.completedStops || []).includes(stop.id));
+              const guideLatLng: LiveLatLng | null = guideCoords
+                ? { lat: guideCoords.latitude, lng: guideCoords.longitude }
+                : liveCoordsRef.current
+                  ? { lat: liveCoordsRef.current.lat, lng: liveCoordsRef.current.lng }
+                  : null;
+              const routeOrigin = sessionActive && guideLatLng ? guideLatLng : null;
+              const routeDestination = sessionActive && nextStop ? { lat: nextStop.lat, lng: nextStop.lng } : null;
+
+              return (
+                <div className="stops-card">
+                  <TourStopsMap
+                    stops={tourStops}
+                    guideLocation={guideLatLng}
+                    routeOrigin={routeOrigin}
+                    routeDestination={routeDestination}
+                  />
+                  <div className="stops-heading">
+                    Tour Type: <span>{session?.tourTypeName || tourTypeNames.join(', ')}</span>
+                  </div>
+                  <ul className="stops-list stops-list--interactive">
+                    {tourStops.map((stop, i) => {
+                      const isVisited = (session?.completedStops || []).includes(stop.id);
+                      return (
+                        <li key={stop.id || `${stop.name}-${i}`} className="stop-row">
+                          <span className={`stop-row-name ${isVisited ? 'stop-row-name--done' : ''}`}>
+                            {stop.name}
+                          </span>
+                          <button
+                            className={`stop-visit-btn ${isVisited ? 'stop-visit-btn--done' : ''}`}
+                            onClick={() => handleToggleStopVisited(stop.id, isVisited)}
+                            disabled={togglingStop === stop.id}
+                          >
+                            <IonIcon icon={checkmarkCircleOutline} />
+                            {isVisited ? 'Visited' : 'Mark as visited'}
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ul>
                 </div>
-                <ul className="stops-list stops-list--interactive">
-                  {tourStops.map((stop, i) => {
-                    const isVisited = (session?.completedStops || []).includes(stop.id);
-                    return (
-                      <li key={stop.id || `${stop.name}-${i}`} className="stop-row">
-                        <span className={`stop-row-name ${isVisited ? 'stop-row-name--done' : ''}`}>
-                          {stop.name}
-                        </span>
-                        <button
-                          className={`stop-visit-btn ${isVisited ? 'stop-visit-btn--done' : ''}`}
-                          onClick={() => handleToggleStopVisited(stop.id, isVisited)}
-                          disabled={togglingStop === stop.id}
-                        >
-                          <IonIcon icon={checkmarkCircleOutline} />
-                          {isVisited ? 'Visited' : 'Mark as visited'}
-                        </button>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </div>
-            )}
+              );
+            })()}
 
             <div className="search-container">
               <IonSearchbar
@@ -786,7 +818,7 @@ const TouristList: React.FC = () => {
                 <IonIcon icon={mailOutline} />
                 <div className="detail-info-text">
                   <span className="detail-label">Email</span>
-                  <span className="detail-value">{selectedTourist.email}</span>
+                  <span className="detail-value">{selectedTourist.email || '—'}</span>
                 </div>
               </div>
               <div className="detail-info-item">
@@ -794,6 +826,20 @@ const TouristList: React.FC = () => {
                 <div className="detail-info-text">
                   <span className="detail-label">Joined</span>
                   <span className="detail-value">{selectedTourist.joinedAt ? formatDate(selectedTourist.joinedAt) : '—'}</span>
+                </div>
+              </div>
+              <div className="detail-info-item">
+                <IonIcon icon={walkOutline} />
+                <div className="detail-info-text">
+                  <span className="detail-label">Age</span>
+                  <span className="detail-value">{selectedTourist.age !== undefined && selectedTourist.age !== '' ? selectedTourist.age : '—'}</span>
+                </div>
+              </div>
+              <div className="detail-info-item">
+                <IonIcon icon={walkOutline} />
+                <div className="detail-info-text">
+                  <span className="detail-label">Birth Date</span>
+                  <span className="detail-value">{selectedTourist.dateOfBirth || '—'}</span>
                 </div>
               </div>
               <div className="detail-info-item">
@@ -815,6 +861,13 @@ const TouristList: React.FC = () => {
                 <div className="detail-info-text">
                   <span className="detail-label">Religion</span>
                   <span className="detail-value">{selectedTourist.religion || '—'}</span>
+                </div>
+              </div>
+              <div className="detail-info-item">
+                <IonIcon icon={walkOutline} />
+                <div className="detail-info-text">
+                  <span className="detail-label">Address</span>
+                  <span className="detail-value">{selectedTourist.address || '—'}</span>
                 </div>
               </div>
               <div className="detail-info-item">

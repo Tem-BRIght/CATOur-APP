@@ -4,7 +4,7 @@ import { httpsCallable } from 'firebase/functions';
 import { 
   IonContent, IonPage, IonToolbar, 
   IonButtons, IonBackButton, IonButton, IonInput, 
-  IonItem, IonLabel, IonIcon, IonAlert,
+  IonItem, IonLabel, IonIcon,
   InputCustomEvent, InputChangeEventDetail
 } from '@ionic/react';
 import { mailOutline, lockClosedOutline, eyeOutline, eyeOffOutline } from 'ionicons/icons';
@@ -12,6 +12,7 @@ import { useSignup } from '../../context/SignupContext';
 import { useAuth } from '../../context/AuthContext';
 import { functions } from '../../firebase';
 import './signup.css';
+import FeedbackOverlay from '../../components/FeedbackOverlay';
 
 const SignUP2: React.FC = () => {
   const history = useHistory();
@@ -200,7 +201,7 @@ const SignUP2: React.FC = () => {
           </div>
         </div>
 
-        <IonAlert
+        <FeedbackOverlay
           isOpen={showAlert}
           onDidDismiss={() => setShowAlert(false)}
           header={alertHeader}

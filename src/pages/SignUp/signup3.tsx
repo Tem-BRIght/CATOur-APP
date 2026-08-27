@@ -3,7 +3,7 @@ import { useHistory } from 'react-router-dom';
 import {
   IonContent, IonPage, IonToolbar,
   IonButtons, IonBackButton, IonButton, IonInput,
-  IonItem, IonLabel, IonIcon, IonLoading, IonAlert,
+  IonItem, IonLabel, IonIcon, IonLoading,
   IonAvatar, IonSelect, IonSelectOption,
 } from '@ionic/react';
 import { cameraOutline, checkmarkCircleOutline } from 'ionicons/icons';
@@ -14,6 +14,7 @@ import { createUserProfile } from '../../services/userProfileService';
 import { useIonRouter, useIonViewWillEnter } from '@ionic/react';
 import OtherSelect from '../../components/OtherSelect';
 import './signup.css';
+import FeedbackOverlay from '../../components/FeedbackOverlay';
 
 const RELIGIONS = [
   'Roman Catholic','Islam','Evangelical','Iglesia ni Cristo','Seventh-day Adventist',
@@ -430,7 +431,7 @@ const SignUP3: React.FC = () => {
         </div>
 
         <IonLoading isOpen={loading} message="Creating your account..." />
-        <IonAlert
+        <FeedbackOverlay
           isOpen={showAlert}
           onDidDismiss={() => setShowAlert(false)}
           header={alertHeader}

@@ -8,7 +8,6 @@ import {
   IonIcon,
   IonInput,
   IonItem,
-  IonNote,
   IonPage,
   IonSpinner,
   IonTitle,
@@ -61,7 +60,7 @@ const REQUIREMENTS: { key: string; label: string; test: (v: string) => boolean }
 const ChangePassword: React.FC = () => {
   const history = useHistory();
   const user = auth.currentUser;
-  const isPasswordProvider = user?.providerData.some((p) => p.providerId === 'password');
+  const isPasswordProvider = user?.providerData.some((p) => p.providerId === 'password') ?? false;
 
   const [fields, setFields] = useState<Record<FieldName, FieldState>>({
     currentPassword: { value: '', visible: false, touched: false },
@@ -234,6 +233,36 @@ const ChangePassword: React.FC = () => {
       </div>
     );
   };
+
+  if (!user || !isPasswordProvider) {
+    return (
+      <IonPage className="cp-page">
+        <IonHeader className="cp-header">
+          <IonToolbar>
+            <IonButtons slot="start">
+              <IonBackButton defaultHref="/settings" text="" />
+            </IonButtons>
+            <IonTitle>Password settings</IonTitle>
+          </IonToolbar>
+        </IonHeader>
+
+        <IonContent className="cp-content" fullscreen>
+          <div className="cp-card cp-provider-message">
+            <div className="cp-intro">
+              <span className="cp-eyebrow">Account security</span>
+              <h1 className="cp-heading">No password to change</h1>
+              <p className="cp-subtext">
+                This account uses Google sign-in. Manage your password through your Google account instead.
+              </p>
+            </div>
+            <IonButton expand="block" className="cp-submit" onClick={() => history.goBack()}>
+              Back to settings
+            </IonButton>
+          </div>
+        </IonContent>
+      </IonPage>
+    );
+  }
 
   return (
     <IonPage className="cp-page">

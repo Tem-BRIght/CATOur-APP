@@ -3,7 +3,7 @@ import { useHistory } from 'react-router-dom';
 import {
   IonContent, IonPage, IonToolbar, IonButtons,
   IonBackButton, IonButton, IonInput, IonItem, IonLabel,
-  IonIcon, IonLoading, IonAlert, IonAvatar, IonSelect, IonSelectOption,
+  IonIcon, IonLoading, IonAvatar, IonSelect, IonSelectOption,
 } from '@ionic/react';
 import { useIonViewWillEnter } from '@ionic/react';
 import { arrowBackOutline, cameraOutline, checkmarkCircleOutline } from 'ionicons/icons';
@@ -15,6 +15,7 @@ import { createUserProfile } from '../../../services/userProfileService';
 import OtherSelect from '../../../components/OtherSelect';
 import '../signup.css';
 import './googleUser.css';
+import FeedbackOverlay from '../../../components/FeedbackOverlay';
 
 const RELIGIONS = [
   'Roman Catholic','Islam','Evangelical','Iglesia ni Cristo','Seventh-day Adventist',
@@ -380,14 +381,14 @@ const GoogleUserProfile: React.FC = () => {
         </div>
 
         <IonLoading isOpen={loading} message={isGoogleUser ? 'Completing your profile...' : 'Creating your account...'} />
-        <IonAlert
+        <FeedbackOverlay
           isOpen={alert.show}
           onDidDismiss={() => setAlert(prev => ({ ...prev, show: false }))}
           header={alert.header}
           message={alert.message}
           buttons={['OK']}
         />
-        <IonAlert
+        <FeedbackOverlay
           isOpen={showCancelAlert}
           onDidDismiss={() => setShowCancelAlert(false)}
           header="Cancel profile setup?"

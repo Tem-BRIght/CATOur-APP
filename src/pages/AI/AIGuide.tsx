@@ -22,7 +22,9 @@ import {
   mic, micOff, send, settingsOutline, search,
   location, star, close, volumeHighOutline,
   pauseCircleOutline, chatbubblesOutline,
-  expandOutline, contractOutline
+  expandOutline, contractOutline,
+  timeOutline, cashOutline, navigateOutline,
+  informationCircleOutline
 } from 'ionicons/icons';
 import { useHistory, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
@@ -103,14 +105,27 @@ interface PlaceSuggestion {
   lng: number | null;
 }
 
-/** Minimal shape IntegratedRouteMap needs — anything with an id plus
- *  resolvable coordinates (a full Destination, the proximity overlay's
- *  flattened destination, etc.). */
+/** Rich shape IntegratedRouteMap supports — includes metadata for the navigation destination card. */
 export interface RouteMapDestination {
   id: string;
+  title?: string;
+  name?: string;
+  image?: string;
+  imageUrl?: string;
+  images?: string[];
+  address?: string;
+  hours?: string;
+  openingHours?: string;
+  admission?: string;
+  price?: string;
+  category?: string;
+  rating?: number;
+  reviews?: number;
+  description?: string;
+  desc?: string;
   lat?: number | null;
   lng?: number | null;
-  location?: { lat?: number | null; lng?: number | null } | null;
+  location?: { lat?: number | null; lng?: number | null } | string | null;
   locationCoords?: { lat?: number | null; lng?: number | null } | null;
 }
 
@@ -139,20 +154,37 @@ export const getCurrentGuideLocation = (): Promise<{ lat: number; lng: number } 
 export const IntegratedRouteMap: React.FC<{
   destination: RouteMapDestination;
   origin: { lat: number; lng: number } | null;
-}> = ({ destination, origin }) => {
+  onClose?: () => void;
+}> = ({ destination, origin, onClose }) => {
+  const history = useHistory();
   const coords = destinationCoords(destination);
   const mapRef = useRef<google.maps.Map | null>(null);
   const [mapsReady, setMapsReady] = useState(false);
   const [directions, setDirections] = useState<google.maps.DirectionsResult | null>(null);
   const [travelMode, setTravelMode] = useState<'walking' | 'driving'>('walking');
+  const [showDetails, setShowDetails] = useState(true);
+
+  const destData = destination as any;
+  const title = destData.title || destData.name || 'Destination';
+  const image = destData.image || destData.imageUrl || (Array.isArray(destData.images) ? destData.images[0] : null) || '/assets/images/placeholder.jpg';
+  const address = destData.address || (typeof destData.location === 'string' ? destData.location : '');
+  const hours = destData.hours || destData.openingHours || '';
+  const admission = destData.admission || destData.price || '';
+  const rating = destData.rating != null ? Number(destData.rating) : null;
+  const reviews = destData.reviews != null ? Number(destData.reviews) : null;
+  const category = destData.category || '';
+
+  const leg = directions?.routes[0]?.legs[0];
+  const durationText = leg?.duration?.text;
+  const distanceText = leg?.distance?.text;
 
   const center = coords ?? origin ?? { lat: 14.5764, lng: 121.0851 };
 
   const fitMapToRoute = useCallback((result: google.maps.DirectionsResult) => {
     const bounds = new google.maps.LatLngBounds();
     result.routes[0]?.overview_path.forEach(point => bounds.extend(point));
-    mapRef.current?.fitBounds(bounds, { top: 40, right: 40, bottom: 40, left: 40 });
-  }, []);
+    mapRef.current?.fitBounds(bounds, { top: 50, right: 40, bottom: showDetails ? 160 : 60, left: 40 });
+  }, [showDetails]);
 
   useEffect(() => {
     if (!mapsReady || !coords || !origin) return;
@@ -172,24 +204,48 @@ export const IntegratedRouteMap: React.FC<{
     });
   }, [coords?.lat, coords?.lng, fitMapToRoute, mapsReady, origin?.lat, origin?.lng, travelMode]);
 
+  const openGoogleMaps = () => {
+    if (!coords) return;
+    const modeParam = travelMode === 'walking' ? 'walking' : 'driving';
+    const url = `https://www.google.com/maps/dir/?api=1&destination=${coords.lat},${coords.lng}&travelmode=${modeParam}`;
+    window.open(url, '_blank', 'noopener,noreferrer');
+  };
+
+  const openDestinationPage = () => {
+    if (!destination.id) return;
+    if (onClose) onClose();
+    history.push(`/destination/${destination.id}`, destination);
+  };
+
   return (
     <div className="ai-route-map-content">
-      <div className="ai-route-mode-switch" role="group" aria-label="Travel mode">
-        <button
-          className={travelMode === 'walking' ? 'active' : ''}
-          onClick={() => setTravelMode('walking')}
-          aria-pressed={travelMode === 'walking'}
-        >
-          Walk
-        </button>
-        <button
-          className={travelMode === 'driving' ? 'active' : ''}
-          onClick={() => setTravelMode('driving')}
-          aria-pressed={travelMode === 'driving'}
-        >
-          Drive
-        </button>
+      {/* Top Header bar with mode switch + ETA */}
+      <div className="ai-route-top-bar">
+        <div className="ai-route-mode-switch" role="group" aria-label="Travel mode">
+          <button
+            className={travelMode === 'walking' ? 'active' : ''}
+            onClick={() => setTravelMode('walking')}
+            aria-pressed={travelMode === 'walking'}
+          >
+            🚶 Walk
+          </button>
+          <button
+            className={travelMode === 'driving' ? 'active' : ''}
+            onClick={() => setTravelMode('driving')}
+            aria-pressed={travelMode === 'driving'}
+          >
+            🚗 Drive
+          </button>
+        </div>
+
+        {durationText && (
+          <div className="ai-route-eta-badge">
+            <span className="ai-route-eta-time">{durationText}</span>
+            <span className="ai-route-eta-dist">({distanceText})</span>
+          </div>
+        )}
       </div>
+
       <LoadScript googleMapsApiKey={import.meta.env.VITE_GOOGLE_MAPS_API_KEY}>
         <GoogleMap
           mapContainerClassName="ai-route-map-frame"
@@ -219,20 +275,91 @@ export const IntegratedRouteMap: React.FC<{
           )}
         </GoogleMap>
       </LoadScript>
+
+      {/* Destination Info Card at bottom of AI Navigation */}
+      <div className={`ai-route-dest-card${showDetails ? '' : ' collapsed'}`}>
+        <button
+          className="ai-route-card-toggle"
+          onClick={() => setShowDetails(prev => !prev)}
+          aria-label={showDetails ? 'Collapse destination card' : 'Expand destination card'}
+        >
+          <span className="ai-route-card-handle" />
+        </button>
+
+        <div className="ai-route-card-header" onClick={openDestinationPage} role="button" tabIndex={0}>
+          <img
+            src={image}
+            alt={title}
+            className="ai-route-card-img"
+            onError={(e) => { (e.currentTarget as HTMLImageElement).src = '/assets/images/placeholder.jpg'; }}
+          />
+          <div className="ai-route-card-meta">
+            <div className="ai-route-card-title-row">
+              <h4 className="ai-route-card-title">{title}</h4>
+              {category && <span className="ai-route-card-cat">{category}</span>}
+            </div>
+            {address && (
+              <p className="ai-route-card-addr">
+                <IonIcon icon={location} /> {address}
+              </p>
+            )}
+            <div className="ai-route-card-tags">
+              {hours && (
+                <span className="ai-route-card-tag">
+                  <IonIcon icon={timeOutline} /> {hours}
+                </span>
+              )}
+              {admission && (
+                <span className="ai-route-card-tag fee">
+                  <IonIcon icon={cashOutline} /> {admission}
+                </span>
+              )}
+              {rating != null && rating > 0 && (
+                <span className="ai-route-card-tag rating">
+                  <IonIcon icon={star} /> {rating.toFixed(1)} {reviews ? `(${reviews})` : ''}
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {showDetails && (
+          <div className="ai-route-card-actions">
+            <button className="ai-route-btn primary" onClick={openDestinationPage}>
+              <IonIcon icon={informationCircleOutline} />
+              <span>View Details</span>
+            </button>
+            <button className="ai-route-btn secondary" onClick={openGoogleMaps}>
+              <IonIcon icon={navigateOutline} />
+              <span>Turn-by-Turn GPS</span>
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   );
 };
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const WELCOME_MESSAGE = "Hello! I'm ALI, your Pasig City guide\nHow can i help you explore today?";
+const WELCOME_MESSAGE = "Mabuhay! I'm ALI, your official AI Tour Guide for Pasig City.\nWhere are you exploring today, or what would you like to discover?";
 
 const SUGGESTED_QUESTIONS = [
   'What are the top 5 must-see places in Pasig?',
-  'What is the top destination this season?',
-  'Recommend historical sites near me',
-  'Find family-friendly spots in Pasig',
-  'What churches can I visit?'
+  'Recommend historical landmarks & heritage churches',
+  'Where are the best local food and dining spots?',
+  'Find family-friendly parks and nature areas',
+  'What are the entrance fees and opening hours for key attractions?',
+  'What are some practical safety tips and etiquette for visiting?'
+];
+
+const QUICK_TOPIC_CHIPS = [
+  { label: 'Top 5 Places', prompt: 'What are the top 5 must-see attractions in Pasig City?' },
+  { label: 'Food & Cafes', prompt: 'What are the best food spots, cafes, and restaurants in Pasig?' },
+  { label: 'Heritage & Churches', prompt: 'What historical landmarks and churches should I visit in Pasig?' },
+  { label: 'Parks & Family', prompt: 'Recommend family-friendly parks and relaxing spots in Pasig.' },
+  { label: 'Hours & Fees', prompt: 'What are the general opening hours and admission fees for attractions in Pasig?' },
+  { label: 'Safety & Tips', prompt: 'What local etiquette, dress codes, and safety tips should I know while touring Pasig?' },
 ];
 
 const FALLBACK_PROFILE_PIC = '/assets/images/Temporary.png';
@@ -271,7 +398,16 @@ function renderInline(text: string): React.ReactNode {
 }
 
 function formatAIMessage(text: string): React.ReactNode {
-  const lines = text.split('\n');
+  // Pre-process: if text contains inline numbered items (e.g. "Intro: 1 Spot A 2 Spot B" or "1. A 2. B"),
+  // split them into distinct lines so each item renders on its own row.
+  let normalizedText = text
+    .replace(/:\s+(\d+[.)]\s+)/g, ':\n\n$1')
+    .replace(/([.!?])\s+(\d+[.)]\s+)/g, '$1\n$2');
+
+  // Handle case where numbers have no period/paren after intro (e.g. "intro: 1 Name – desc 2 Name – desc")
+  normalizedText = normalizedText.replace(/([.!?])\s+(\d+)\s+([A-Z][^\n]+?\s*[–—-]\s*)/g, '$1\n$2. $3');
+
+  const lines = normalizedText.split('\n');
   const elements: React.ReactNode[] = [];
   const numberedItems: { num: string; content: string }[] = [];
   const bulletItems: string[] = [];
@@ -305,8 +441,8 @@ function formatAIMessage(text: string): React.ReactNode {
   lines.forEach((line, idx) => {
     const t = line.trim();
 
-    // Numbered list item: "1. ..." or "1) ..."
-    const numMatch = t.match(/^(\d+)[.)]\s+(.+)$/);
+    // Numbered list item: "1. ..." or "1) ..." or "1 - ..."
+    const numMatch = t.match(/^(\d+)[.)\-]\s+(.+)$/);
     if (numMatch) {
       flushBullets();
       numberedItems.push({ num: numMatch[1], content: numMatch[2] });
@@ -1063,7 +1199,9 @@ const AIGuide: React.FC = () => {
                         : undefined
                     }
                   >
-                    {msg.sender === 'ai' ? formatAIMessage(msg.text) : msg.text}
+                    <div className="bubble-content">
+                      {msg.sender === 'ai' ? formatAIMessage(msg.text) : <span className="user-text">{msg.text}</span>}
+                    </div>
 
                     <time
                       className="message-timestamp"
@@ -1240,6 +1378,22 @@ const AIGuide: React.FC = () => {
 
           <div ref={messagesEndRef} />
         </div>
+
+        {/* Quick topic chips row */}
+        {!isBusy && (
+          <div className="ai-chat-quick-chips-row" role="toolbar" aria-label="Quick topic prompts">
+            {QUICK_TOPIC_CHIPS.map((chip, idx) => (
+              <button
+                key={idx}
+                className="ai-chat-quick-chip"
+                onClick={() => sendMessage(chip.prompt)}
+                disabled={isBusy}
+              >
+                {chip.label}
+              </button>
+            ))}
+          </div>
+        )}
 
         {/* Input bar */}
         <div className="input-area" role="search" aria-label="Chat input">

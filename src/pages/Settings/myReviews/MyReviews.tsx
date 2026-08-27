@@ -8,7 +8,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
   IonPage, IonHeader, IonToolbar, IonTitle, IonContent,
   IonButtons, IonBackButton, IonIcon, IonLoading, IonToast,
-  IonRefresher, IonRefresherContent, IonAlert,
+  IonRefresher, IonRefresherContent,
 } from '@ionic/react';
 import { useIonRouter } from '@ionic/react';
 import {
@@ -24,6 +24,7 @@ import { firestore } from '../../../firebase';
 import { useAuth } from '../../../context/AuthContext';
 import { getUserProfile, UserProfile } from '../../../services/userProfileService';
 import './MyReviews.css';
+import FeedbackOverlay from '../../../components/FeedbackOverlay';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface MyReview {
@@ -382,14 +383,14 @@ const MyReviews: React.FC = () => {
         )}
 
         {/* Delete confirmation */}
-        <IonAlert
+        <FeedbackOverlay
           isOpen={!!deleteTarget}
           onDidDismiss={() => setDeleteTarget(null)}
           header="Delete Review"
           message={`Remove your review for "${deleteTarget?.destName}"? This cannot be undone.`}
           buttons={[
             { text: 'Cancel', role: 'cancel' },
-            { text: 'Delete', cssClass: 'alert-button-danger', handler: confirmDelete },
+            { text: 'Delete', role: 'destructive', handler: confirmDelete },
           ]}
         />
 

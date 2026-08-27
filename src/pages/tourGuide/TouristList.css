@@ -395,11 +395,68 @@
   .detail-avatar-container h2 {
     font-size: 1.3rem;
   }
+
+  .tourist-table-header {
+    display: none;
+  }
+
+  .tourist-page-card {
+    margin-right: var(--catour-space-page);
+    margin-left: var(--catour-space-page);
+  }
+
+  .tourist-page-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 0.5rem 0.85rem;
+    --padding-start: 1rem;
+    --inner-padding-end: 1rem;
+    --min-height: 0;
+    padding-top: 0.9rem;
+    padding-bottom: 0.9rem;
+  }
+
+  .tourist-page-row > div {
+    width: auto;
+    min-width: 0;
+    padding-left: 0;
+    white-space: normal;
+  }
+
+  .row-col-id {
+    display: none;
+  }
+
+  .row-col-name {
+    grid-column: 1 / -1;
+  }
+
+  .row-col-gender::before,
+  .row-col-nationality::before,
+  .row-col-religion::before,
+  .row-col-email::before {
+    display: block;
+    color: #8fa3bc;
+    content: 'Gender';
+    font-size: 0.68rem;
+    font-weight: 600;
+    margin-bottom: 0.15rem;
+    text-transform: uppercase;
+  }
+
+  .row-col-nationality::before { content: 'Nationality'; }
+  .row-col-religion::before { content: 'Religion'; }
+  .row-col-email::before { content: 'Email'; }
+
+  .row-col-feedback {
+    grid-column: 1 / -1;
+    padding-left: 0;
+  }
 }
 /* ── Session FAB ── */
 .session-fab-wrap {
   position: fixed;
-  bottom: 2rem;
+  bottom: calc(2rem + var(--catour-safe-bottom));
   right: 1.25rem;
   z-index: 999;
 }

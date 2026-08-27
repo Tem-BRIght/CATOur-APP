@@ -43,9 +43,8 @@ interface GroqChatResponse {
 }
 const callGroqChat = httpsCallable<GroqChatRequest, GroqChatResponse>(functions, 'groqChat');
 
-// Lightweight intent detection so we can hand ALI real numbers (actual
-// walking distance/ETA, actual current weather) instead of letting the
-// model guess/hallucinate them.
+// Lightweight intent detection so we can hand ALI real numbers and verified details
+// instead of letting the model guess or hallucinate them.
 const DIRECTIONS_INTENT =
   /\b(direction|route|how (do|can|to) i get|how far|way to get|paano (ako )?(pumunta|makarating|makakarating)|papaano|paano po|saan (ang daan|papunta)|malayo ba|gaano kalayo)\b/i;
 
@@ -66,6 +65,21 @@ const RATING_INTENT =
 
 const VISITS_INTENT =
   /\b(most visited|most visits|top visited|most popular|popular places?|top destinations?)\b/i;
+
+const SAFETY_ETIQUETTE_INTENT =
+  /\b(safe|safety|scam|scams|dress code|etiquette|custom|customs|bawal|rules|guidelines|night|danger|safe to walk|ingat)\b/i;
+
+const LOGISTICS_INTENT =
+  /\b(fee|entrance|admission|ticket|price|magkano|bayad|hours|opening hours|schedule|oras|restroom|toilet|cr|comfort room|parking)\b/i;
+
+const FOOD_INTENT =
+  /\b(food|eat|restaurant|kainan|cafe|dining|coffee|street food|snack|merienda|dinner|lunch|breakfast|kain|bakery|panaderya)\b/i;
+
+const BIKING_INTENT =
+  /\b(bike|biking|bicycle|bike lane|bike route|cycling|cyclist|padyak|siklista)\b/i;
+
+const RESTING_PARK_INTENT =
+  /\b(rest|resting|bench|sit|chill|relax|park|parks|plaza|plazas|picnic|tambay|pahinga|upuan)\b/i;
 
 // ── Public types ──────────────────────────────────────────────────────────────
 
@@ -91,53 +105,55 @@ export interface AskAIGuideParams {
 // ── System prompt ─────────────────────────────────────────────────────────────
 
 const SYSTEM_PROMPT = `
-You are ALI, the official AI tour guide for the CATOUR app. You ONLY help tourists
-discover and plan visits to places in Pasig City, Philippines.
+You are ALI, the official AI Tour Guide for the CATOUR app in Pasig City, Philippines.
+You assist signed-in tourists who are actively exploring destinations in Pasig City.
 
-Rules you must always follow:
-1. SCOPE: Only ever discuss Pasig City tourism (destinations, culture, food, transport,
-   getting-around tips within Pasig City). If the user asks about anything outside that
-   scope (other cities, countries, or unrelated topics), politely decline and steer the
-   conversation back to what you can help with in Pasig City. Never answer the
-   off-topic question itself.
-2. GROUNDING: Only recommend destinations that appear in the "AVAILABLE DESTINATIONS"
-   list you're given below. Never invent a place, rating, or address that isn't there.
-   If the CONTEXT section includes a "Current weather" line or a "Walking route" /
-   "Straight-line distance" line, treat those as verified facts you may quote — never
-   invent your own temperature, rain status, walking distance, or ETA. If no such line
-   is present but the tourist asks about weather or directions, say you don't have that
-   information right now rather than guessing a number.
-3. PERSONALIZATION: If the tourist's recent searches or previously visited places are
-   provided, use them to tailor suggestions (e.g. lean into the category they keep
-   searching for), but don't mention "your data" explicitly — just be naturally helpful.
-4. SPECIFICITY: If the user asks about something specific, or distances are provided,
-   prioritize the closest relevant matches and say roughly how far they are.
-5. POPULARITY: When the user asks for general recommendations ("what should I visit",
-   "what's popular"), prefer destinations with higher rank/rating/review counts —
-   these represent the most-visited spots in the app.
-6. TONE: Professional, warm, and easy to understand. Avoid jargon. Keep replies
-   concise — 2 to 3 sentences, unless the user asks for more detail.
-7. LANGUAGE: Always reply in the same language style as the tourist's message —
-   English, Tagalog, or a natural Taglish mix — matching their phrasing rather than
-   defaulting to English. Write natural sentences and paragraphs by default; only
-   use a numbered/bulleted list when you're actually listing several distinct
-   places or steps.
-8. OUTPUT FORMAT: Respond with STRICT JSON only — no markdown, no code fences, no
-   commentary outside the JSON — matching exactly this shape:
-   {"reply": "<what ALI says out loud to the user>", "recommendedDestinationIds": ["id1","id2"]}
-   - "recommendedDestinationIds" must only contain IDs copied exactly from the
-     AVAILABLE DESTINATIONS list.
-   - Use at most ${MAX_RECOMMENDATIONS} IDs, ordered best-match first.
-   - Use an empty array when no specific destination applies (e.g. a scope refusal,
-     or a general question that doesn't need cards).
-9. Help Center: If the tourist asks for help with the app itself (login, account, notifications, etc.),
-    politely answer in a concise way, what system features are available, and refer them to the app's 
-    Help Center for more details. Do not provide any personal account information or troubleshooting 
-    steps that require access to the user's account.
-10. SUPPORT: If the tourist asks about app support, contacting the Cultural Affair Tourism Office (CATO),
-    or the Help Center, provide support@catour.app, (02) 8643-1111 loc 1156, Monday-Friday 9:00 AM-5:00 PM,
-    and Pasig City CATO Office. Suggest Settings > Contact Support for more help.
-  
+Response Style:
+- Always answer in complete, well-formed sentences. Never send sentence fragments or placeholder text.
+- Respond immediately and directly — lead with the answer first, then add context. Don't preface with filler like "Let me think" or "I'll look that up."
+- Keep responses short and readable: 2–4 sentences for simple questions, up to a short paragraph for directions or historical context. Tourists are reading this on mobile outdoors.
+- Use a warm, friendly, knowledgeable local-guide tone — like a helpful local resident who knows the city inside out.
+- Avoid jargon; assume the tourist may not speak Tagalog fluently or know local customs.
+- Match the tourist's language style (English, Tagalog, or a natural Taglish mix).
+
+Formatting for Lists & Recommendations (Text Display & Readability):
+- When a response includes multiple items (recommendations, spots to visit, steps, or options of 3 or more items):
+  - NEVER run items together in a single paragraph with inline numbers (e.g. NEVER write "1) Spot A, 2) Spot B, 3) Spot C").
+  - Start with a short intro sentence, then break into a new line — don't continue the numbered items on the same line as the intro.
+  - Put EACH numbered item on its OWN line, formatted strictly as:
+    1. **[Name/Title]** – [short description].
+    2. **[Name/Title]** – [short description].
+  - Keep the number, title, and dash style (" – ") consistently structured across all items.
+  - Keep each item's description short — one sentence, under 20 words — so the list stays scannable rather than dense.
+
+Knowledge Scope & Broad Coverage:
+- Do not limit answers to only the curated list of tourist spots in the primary database. Also discuss and recommend food spots (e.g., Kapitolyo dining district, Caruncho Ave night food stalls, Pasig Mega Market specialties), resting spots (parks, benches, plazas like Plaza Rizal, Rainforest Adventure Park lawns, Capitol Commons park, Ortigas Park, Pasig River Esplanade), and biking-friendly routes/spots (e.g., Emerald Avenue car-free Sundays, CATO bike lanes, linear parks) when asked.
+- If asked about a category or spot with limited data (e.g., local bakeries, specific barangay landmarks): acknowledge the gap politely, offer the closest relevant known spots or area context, and suggest how they can find more (e.g., "I don't have confirmed details on that specific bakery yet, but you can find great local treats near Pasig Mega Market or Kapitolyo!"). Never give a flat dead-end refusal.
+
+Location Accuracy (Critical):
+- Always ground answers strictly in Pasig City, Philippines. Never answer with details or recommendations for another city (e.g. do NOT mix up details or describe Manila, Makati, Boracay, or Baguio).
+- Before responding, confirm the place referenced is in Pasig City. If a spot name is ambiguous or outside Pasig City, say so explicitly rather than substituting unrelated location information.
+- Never generate false historical or factual claims for places without data.
+
+Depth & Usefulness of Answers:
+- Avoid generic one-line descriptions. Where applicable, include practical, in-depth details:
+  - What visitors can actually see or do there (not just what it is).
+  - Best time to visit, and typical time needed.
+  - Standout feature that makes it worth visiting versus similar spots.
+- Help the tourist decide WHY to go, not just that it exists.
+
+Handling Uncertainty:
+- Replace flat refusals like "cannot confirm because no reliable source" with a helpful, specific response: explain what detail is unconfirmed (e.g. holiday operating hours, live menu pricing), suggest checking posted signs on-site or official sources, and pivot to verified nearby options.
+
+Voice Input & Code-Switching Robustness:
+- Account for speech-to-text pronunciation variations, Filipino/Taglish accents, and phonetic mismatches (e.g. "Dimas Alang", "Maybunga", "Bitukang Manok", "Bahay na Tisa", "Pizang Rizal"). If speech input is ambiguous or doesn't match any place, ask a short clarifying question (e.g. "Did you mean [closest match]?") rather than guessing unrelated information.
+
+Output Format & Grounding:
+- Output STRICT JSON only — no markdown outside JSON, no backticks:
+  {"reply": "<what ALI says to the tourist>", "recommendedDestinationIds": ["id1", "id2"]}
+  - "recommendedDestinationIds" must only contain valid IDs from AVAILABLE DESTINATIONS (at most ${MAX_RECOMMENDATIONS} IDs, best-match first).
+  - Use an empty array [] when recommending general food strips, bike routes, or when no database card is needed.
+- SUPPORT: If asked about app help, CATO, or office contacts, provide support@catour.app, (02) 8643-1111 loc 1156, Mon-Fri 9AM-5PM, Pasig City CATO Office, or Settings > Contact Support.
 `.trim();
 
 // ── Destination ranking / catalog building ───────────────────────────────────
@@ -228,7 +244,10 @@ function buildCatalogText(ranked: RankedDestination[]): string {
       const reviews = dd.reviews || 0;
       const desc = (dd.desc || dd.description || '').slice(0, 140);
       const distancePart = distanceKm != null ? ` | ${distanceKm.toFixed(1)}km away` : '';
-      return `- ID:${dest.id} | ${name} | ${category} | rating ${rating} (${reviews} reviews)${distancePart} | ${desc}`;
+      const hoursPart = dd.hours ? ` | Hours: ${dd.hours}` : '';
+      const admissionPart = dd.admission ? ` | Fee: ${dd.admission}` : '';
+      const addressPart = dd.address ? ` | Addr: ${dd.address}` : '';
+      return `- ID:${dest.id} | ${name} | ${category} | rating ${rating} (${reviews} reviews)${distancePart}${hoursPart}${admissionPart}${addressPart} | ${desc}`;
     })
     .join('\n');
 }
@@ -635,6 +654,91 @@ Respond ONLY with a valid JSON array, no markdown, no code fences.`;
   return buildFallbackItinerary(dest);
 }
 
+function generateSmartLocalFallback(
+  message: string,
+  ranked: RankedDestination[],
+  showRouteToId?: string
+): AIGuideResponse {
+  const topSpots = ranked.slice(0, 3);
+  const topIds = topSpots.map(r => r.dest.id);
+
+  // 1. Food intent
+  if (FOOD_INTENT.test(message)) {
+    return {
+      reply: `Here are great food hubs to explore in Pasig City:
+
+1. **Kapitolyo Dining Strip** – Renowned foodie hub with cozy artisan cafés, local grill houses, and craft eateries.
+2. **Pasig Mega Market** – Famous for traditional Filipino street snacks, local kakanin, and fresh fruit stalls.
+3. **Caruncho Avenue Food Stalls** – Great for quick evening bites, refreshing drinks, and budget-friendly merienda.`,
+      recommendedDestinationIds: topIds.slice(0, 2),
+      showRouteToId,
+    };
+  }
+
+  // 2. Biking intent
+  if (BIKING_INTENT.test(message)) {
+    return {
+      reply: `Here are top biking-friendly routes and spots in Pasig City:
+
+1. **Emerald Avenue (Car-Free Sundays)** – Open, safe street for cycling, walking, and outdoor fitness.
+2. **Pasig Linear Parks & CATO Bike Lanes** – Scenic riverside corridors connecting heritage spots with dedicated bike paths.
+3. **Rainforest Adventure Park Trails** – Paved greenery loops ideal for casual pedaling and family rides.`,
+      recommendedDestinationIds: topIds.slice(0, 2),
+      showRouteToId,
+    };
+  }
+
+  // 3. Resting / Parks intent
+  if (RESTING_PARK_INTENT.test(message)) {
+    return {
+      reply: `Here are relaxing resting spots and open green parks in Pasig City:
+
+1. **Plaza Rizal** – Shaded historic town square with benches right in front of the cathedral.
+2. **Rainforest Adventure Park** – Sprawling public park with shaded picnic groves, a lagoon, and mini zoo.
+3. **Capitol Commons Park** – Modern open lawn with shaded benches and breezy walking paths near cafés.`,
+      recommendedDestinationIds: topIds.slice(0, 2),
+      showRouteToId,
+    };
+  }
+
+  // 4. Logistics / Hours / Fees
+  if (LOGISTICS_INTENT.test(message)) {
+    if (topSpots.length > 0) {
+      const d = topSpots[0].dest as any;
+      const title = d.title || d.name || 'this destination';
+      const hours = d.hours || 'regular visiting hours';
+      const fee = d.admission || 'free admission';
+      return {
+        reply: `${title} is located in Pasig City with ${fee} and is open during ${hours}. Feel free to check the details card below for full visitor guidelines.`,
+        recommendedDestinationIds: [topSpots[0].dest.id],
+        showRouteToId,
+      };
+    }
+  }
+
+  // 5. General / Best Spots / Recommendations
+  if (topSpots.length > 0) {
+    const listLines = topSpots.map((r, i) => {
+      const dd = r.dest as any;
+      const name = dd.title || dd.name || `Spot ${i + 1}`;
+      const desc = dd.shortDescription || dd.desc || dd.category || 'Historical landmark and visitor favorite in Pasig.';
+      return `${i + 1}. **${name}** – ${desc.slice(0, 80).trim()}.`;
+    });
+
+    return {
+      reply: `Here are top must-see spots in Pasig City:\n\n${listLines.join('\n')}`,
+      recommendedDestinationIds: topIds,
+      showRouteToId,
+    };
+  }
+
+  return {
+    reply: "Welcome to Pasig City! I can help you find historic landmarks, great local food spots, and relaxing parks across the city. What would you like to explore today?",
+    recommendedDestinationIds: [],
+    showRouteToId,
+  };
+}
+
 export async function askAIGuide(params: AskAIGuideParams): Promise<AIGuideResponse> {
   const { uid, message, history = [], destinations, coords } = params;
 
@@ -702,15 +806,32 @@ export async function askAIGuide(params: AskAIGuideParams): Promise<AIGuideRespo
     }
   }
 
+  // If asking about logistics (fees/hours/restrooms) or safety/etiquette for a specific place
+  if (LOGISTICS_INTENT.test(message) || SAFETY_ETIQUETTE_INTENT.test(message) || FOOD_INTENT.test(message) || BIKING_INTENT.test(message) || RESTING_PARK_INTENT.test(message)) {
+    const candidate = findDestinationForQuestion(message, ranked, history);
+    if (candidate) {
+      const cd = candidate as any;
+      const cName = cd.title || cd.name || 'this destination';
+      const details: string[] = [`Verified details for ${cName}:`];
+      if (cd.hours) details.push(`- Hours: ${cd.hours}`);
+      if (cd.admission) details.push(`- Admission/Fee: ${cd.admission}`);
+      if (cd.address) details.push(`- Address: ${cd.address}`);
+      if (cd.suitableFor) details.push(`- Good for: ${cd.suitableFor}`);
+      if (cd.whatToBring) details.push(`- What to bring/wear: ${cd.whatToBring}`);
+      if (Array.isArray(cd.nearbyAttractions) && cd.nearbyAttractions.length) {
+        details.push(`- Nearby spots: ${cd.nearbyAttractions.map((n: any) => n.name || n).join(', ')}`);
+      }
+      contextLines.push(details.join('\n'));
+    }
+  }
+
   const userPrompt = [
     `AVAILABLE DESTINATIONS (Pasig City only):\n${catalogText || '(none loaded)'}`,
     contextLines.length ? `CONTEXT:\n${contextLines.join('\n')}` : '',
     `TOURIST MESSAGE: ${message}`,
   ].filter(Boolean).join('\n\n');
 
-  // CHANGED — routes through the groqChat Cloud Function instead of
-  // fetching Groq directly. No client-side API key check needed anymore;
-  // the function itself decides whether it's configured.
+  // Route through groqChat Cloud Function, with instant smart fallback
   try {
     const result = await callGroqChat({
       messages: [
@@ -719,19 +840,19 @@ export async function askAIGuide(params: AskAIGuideParams): Promise<AIGuideRespo
         { role: 'user', content: userPrompt },
       ],
       temperature: 0.6,
-      max_tokens: 400,
+      max_tokens: 600,
       top_p: 0.9,
     });
 
     const text = result.data.reply;
-    if (!text) return FALLBACK_RESPONSE;
+    if (!text) return generateSmartLocalFallback(message, ranked, showRouteToId);
 
     const parsed = safeParseAIGuideJSON(text, ranked);
     const requestedIds = getRequestedRecommendationIds(message, ranked);
     const response = requestedIds ? { ...parsed, recommendedDestinationIds: requestedIds } : parsed;
     return showRouteToId ? { ...response, showRouteToId } : response;
   } catch (err) {
-    console.error('[aiGuideService] askAIGuide failed:', err);
-    return FALLBACK_RESPONSE;
+    console.warn('[aiGuideService] askAIGuide fell back to local intelligence:', err);
+    return generateSmartLocalFallback(message, ranked, showRouteToId);
   }
 }

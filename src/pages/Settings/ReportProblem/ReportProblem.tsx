@@ -15,7 +15,6 @@ import {
   IonTextarea,
   IonInput,
   IonToast,
-  IonAlert,
 } from '@ionic/react';
 import {
   bugOutline,
@@ -35,6 +34,7 @@ import { useAuth } from '../../../context/AuthContext';
 import { firestore, storage } from '../../../firebase';
 
 import './ReportProblem.css';
+import FeedbackOverlay from '../../../components/FeedbackOverlay';
 
 type Category = 'Bug / Crash' | 'Map Issue' | 'Account' | 'Connectivity' | 'Other' | '';
 type Severity = 'Low' | 'Medium' | 'High' | '';
@@ -242,7 +242,7 @@ const ReportProblem: React.FC = () => {
         </div>
 
         {/* Confirmation alert */}
-        <IonAlert
+        <FeedbackOverlay
           isOpen={showConfirm}
           onDidDismiss={() => setShowConfirm(false)}
           header="Submit Report"

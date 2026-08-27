@@ -325,6 +325,14 @@
   letter-spacing: 0.5px;
 }
 
+.modal-tour-info-id--empty {
+  font-family: inherit;
+  font-style: italic;
+  font-weight: 500;
+  color: #8fa3bc;
+  letter-spacing: normal;
+}
+
 .modal-tour-info-destinations {
   margin: 0.2rem 0 0 0;
   padding-left: 1.1rem;
@@ -426,9 +434,35 @@
   border-bottom: 1px solid #f0f6fd;
 }
 
-.tourist-table-row .col-no    { color: #1a8fe3; font-weight: 700; font-size: 0.9rem; }
-.tourist-table-row .col-name  { font-weight: 600; color: #0d2f6e; font-size: 0.93rem; }
-.tourist-table-row .col-email { color: #5a6a7a; font-size: 0.88rem; }
+/* IonItem's default (unnamed) slot stacks content vertically — the header
+   uses display:flex but the rows never did, which is why columns collapsed
+   and the email/status pill wrapped onto their own lines. Match the header. */
+.tourist-table-row::part(native) {
+  align-items: flex-start;
+  padding-top: 0.6rem;
+  padding-bottom: 0.6rem;
+}
+
+.tourist-table-row,
+.tourist-table-row .item-inner,
+.tourist-table-row .in-list {
+  display: flex;
+  align-items: flex-start;
+  width: 100%;
+}
+
+.tourist-table-row .col-no    { color: #1a8fe3; font-weight: 700; font-size: 0.9rem; padding-top: 0.15rem; }
+.tourist-table-row .col-name  { font-weight: 600; color: #0d2f6e; font-size: 0.93rem; padding-top: 0.15rem; }
+.tourist-table-row .col-email {
+  color: #5a6a7a;
+  font-size: 0.88rem;
+  word-break: break-word;   /* was breaking mid-character; break at word boundaries */
+  overflow-wrap: break-word;
+  line-height: 1.35;
+  padding-top: 0.15rem;
+  padding-right: 0.35rem;
+}
+.tourist-table-row .col-status { display: flex; align-items: flex-start; justify-content: center; }
 
 .status-cell {
   display: flex;
@@ -452,17 +486,38 @@
 
 /* ── Modal Footer ── */
 .modal-footer {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
   padding-top: 0.25rem;
   padding-bottom: 0.5rem;
 }
 
+.feedback-modal-btn,
 .close-modal-btn {
-  --background: linear-gradient(135deg, #0d2f6e 0%, #1a8fe3 100%);
-  --border-radius: 3rem;
+  --border-radius: 0.8rem;
   --padding-top: 1rem;
   --padding-bottom: 1rem;
-  font-weight: 700;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
   margin: 0;
+  height: 52px;
+}
+
+.feedback-modal-btn {
+  --background: linear-gradient(135deg, #0d2f6e 0%, #1a5cb8 100%);
+  --box-shadow: none;
+}
+
+.close-modal-btn {
+  --background: transparent;
+  --background-activated: rgba(13, 47, 110, 0.06);
+  --color: #0d2f6e;
+  --box-shadow: none;
+  --border-width: 1.5px;
+  --border-style: solid;
+  --border-color: #c8dff6;
 }
 
 /* ── Responsive ── */

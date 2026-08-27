@@ -8,7 +8,6 @@ import {
   IonTitle,
   IonIcon,
   IonButton,
-  IonAlert,
 } from '@ionic/react';
 import {
   arrowBackOutline,
@@ -27,6 +26,7 @@ import { doc, updateDoc } from 'firebase/firestore';
 import { firestore } from '../../firebase';
 import { useAuth } from '../../context/AuthContext';
 import './ChangePassword.css';
+import FeedbackOverlay from '../../components/FeedbackOverlay';
 
 const auth = getAuth();
 
@@ -270,7 +270,7 @@ const ChangePassword: React.FC<Props> = ({ forced: forcedProp, onForceComplete }
         </div>
       </IonContent>
 
-      <IonAlert
+      <FeedbackOverlay
         isOpen={showSuccessAlert}
         onDidDismiss={handleSuccessDismiss}
         header="Password Updated"

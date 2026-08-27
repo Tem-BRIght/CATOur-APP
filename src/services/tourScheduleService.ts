@@ -99,11 +99,133 @@ function isSlotJoinable(slot: any): boolean {
 
   if (date < todayStr) return false;
   if (date === todayStr) {
-    const slotEndMs = new Date(`${date}T${endTime}:00`).getTime();
+    const slotStartDate = new Date(`${date}T${String(slot?.startTime || '00:00')}:00`);
+    const slotEndDate = new Date(`${date}T${endTime}:00`);
+    if (slotEndDate <= slotStartDate) slotEndDate.setDate(slotEndDate.getDate() + 1);
+    const slotEndMs = slotEndDate.getTime();
     if (Number.isNaN(slotEndMs) || slotEndMs <= now.getTime()) return false;
   }
 
   return true;
+}
+
+export interface TourBookingConflict {
+  hasConflict: boolean;
+  type: 'same_tour_type_same_day' | 'time_overlap' | null;
+  message?: string;
+  conflictingTourName?: string;
+}
+
+export function parseSlotTimeRange(date: string, startTime: string, endTime: string): { startMs: number; endMs: number } {
+  const startMs = new Date(`${date}T${startTime}:00`).getTime();
+  let endMs = new Date(`${date}T${endTime}:00`).getTime();
+  if (Number.isNaN(endMs) || endMs <= startMs) {
+    endMs = startMs + 60 * 60 * 1000;
+  }
+  return { startMs, endMs };
+}
+
+export function checkTourBookingConflict(
+  sessions: Array<{
+    status?: string;
+    tourTypeId?: string;
+    tourTypeName?: string;
+    cancelledUids?: string[];
+    startTime?: string;
+    endTime?: string;
+    date?: string;
+  }>,
+  target: {
+    tourTypeId: string;
+    date: string;
+    startTime: string;
+    endTime: string;
+  },
+  userId?: string,
+): TourBookingConflict {
+  const { startMs: targetStart, endMs: targetEnd } = parseSlotTimeRange(target.date, target.startTime, target.endTime);
+
+  for (const session of sessions || []) {
+    // Skip cancelled sessions or sessions where this user's registration was cancelled
+    if (session.status === 'Cancelled') continue;
+    if (userId && session.cancelledUids?.includes(userId)) continue;
+
+    // Determine session's date string (YYYY-MM-DD)
+    let sessionDate = session.date || '';
+    let sessionStartMs = 0;
+    let sessionEndMs = 0;
+
+    if (session.startTime) {
+      const d = new Date(session.startTime);
+      if (!Number.isNaN(d.getTime())) {
+        sessionStartMs = d.getTime();
+        if (!sessionDate) {
+          const year = d.getFullYear();
+          const month = String(d.getMonth() + 1).padStart(2, '0');
+          const day = String(d.getDate()).padStart(2, '0');
+          sessionDate = `${year}-${month}-${day}`;
+        }
+      }
+    }
+
+    if (session.endTime) {
+      const d = new Date(session.endTime);
+      if (!Number.isNaN(d.getTime())) {
+        sessionEndMs = d.getTime();
+      }
+    }
+
+    if (sessionStartMs > 0 && (sessionEndMs <= sessionStartMs || Number.isNaN(sessionEndMs))) {
+      sessionEndMs = sessionStartMs + 60 * 60 * 1000;
+    }
+
+    // 1. Same tour type on the same date (Rule: 1 tour type per day to every tourist)
+    if (session.tourTypeId === target.tourTypeId && sessionDate === target.date) {
+      return {
+        hasConflict: true,
+        type: 'same_tour_type_same_day',
+        message: 'You have already joined this tour type for this date. Tourists can join only one session per tour type per day.',
+        conflictingTourName: session.tourTypeName,
+      };
+    }
+
+    // 2. Overlapping date and time on the same date (Rule: conflict on different tour type but same date and time)
+    if (sessionDate === target.date && sessionStartMs > 0 && sessionEndMs > 0 && !Number.isNaN(targetStart) && !Number.isNaN(targetEnd)) {
+      const isOverlap = targetStart < sessionEndMs && targetEnd > sessionStartMs;
+      if (isOverlap) {
+        return {
+          hasConflict: true,
+          type: 'time_overlap',
+          message: `This session conflicts with another tour (${session.tourTypeName || 'Scheduled Tour'}) you have already joined on the same date and time.`,
+          conflictingTourName: session.tourTypeName,
+        };
+      }
+    }
+  }
+
+  return { hasConflict: false, type: null };
+}
+
+export function hasTourTypeConflict(
+  sessions: Array<{
+    status?: string;
+    tourTypeId?: string;
+    tourTypeName?: string;
+    cancelledUids?: string[];
+    startTime?: string;
+    endTime?: string;
+    date?: string;
+  }>,
+  targetOrTourTypeId: string | { tourTypeId: string; date: string; startTime: string; endTime: string },
+  userId?: string,
+): boolean {
+  if (typeof targetOrTourTypeId === 'string') {
+    return sessions.some((session) => (
+      session.status !== 'Cancelled' && session.tourTypeId === targetOrTourTypeId
+        && (!userId || !session.cancelledUids?.includes(userId))
+    ));
+  }
+  return checkTourBookingConflict(sessions, targetOrTourTypeId, userId).hasConflict;
 }
 
 /**
@@ -397,6 +519,21 @@ export async function joinTour(
     throw new Error('Your account requires a valid email before joining a tour. Please verify your profile.');
   }
 
+  const joinedSessionsSnap = await getDocs(
+    query(collection(db, 'sessions'), where('touristUids', 'array-contains', userId))
+  );
+  const joinedSessions = (joinedSessionsSnap?.docs || []).map((sessionDoc) => (
+    sessionDoc.data() as {
+      status?: string;
+      tourTypeId?: string;
+      tourTypeName?: string;
+      cancelledUids?: string[];
+      startTime?: string;
+      endTime?: string;
+      date?: string;
+    }
+  ));
+
   const guideRef = doc(db, 'tourGuides', guideId);
 
   // Returned out of the transaction so the session-sync step below has
@@ -420,6 +557,7 @@ export async function joinTour(
     const slotEndTime = String(slot.endTime ?? slot.startTime ?? '');
     const slotStartDate = new Date(`${slotDateString}T${slotStartTime}:00`);
     const slotEndDate = new Date(`${slotDateString}T${slotEndTime}:00`);
+    if (slotEndDate <= slotStartDate) slotEndDate.setDate(slotEndDate.getDate() + 1);
     if (Number.isNaN(slotStartDate.getTime()) || Number.isNaN(slotEndDate.getTime())) {
       throw new Error('Invalid slot date or time');
     }
@@ -428,8 +566,19 @@ export async function joinTour(
       throw new Error('This slot has already ended and can no longer be joined.');
     }
 
-    const maxSpots = slot.maxSpots ?? 10;
-    const bookedCount = slot.bookedCount ?? 0;
+    const conflictCheck = checkTourBookingConflict(joinedSessions, {
+      tourTypeId,
+      date: slotDateString,
+      startTime: slotStartTime,
+      endTime: slotEndTime,
+    }, userId);
+    if (conflictCheck.hasConflict) {
+      throw new Error(conflictCheck.message || 'You cannot join this tour due to a scheduling conflict.');
+    }
+
+    const maxSpots = Number(slot.maxSpots ?? 10);
+    const bookedCount = Number(slot.bookedCount ?? slot.sessionCount ?? 0);
+    const sessionCount = Number(slot.sessionCount ?? bookedCount);
     const joinedUserIds = slot.joinedUserIds ?? [];
 
     if (bookedCount >= maxSpots) {
@@ -443,6 +592,7 @@ export async function joinTour(
     const updatedSlot = {
       ...slot,
       bookedCount: bookedCount + 1,
+      sessionCount: sessionCount + 1,
       joinedUserIds: [...joinedUserIds, userId],
     };
     const newSlots = [...slots];
@@ -496,10 +646,10 @@ export async function joinTour(
       message: `You have joined the tour "${session.destinationName}" with guide ${bookedSlot.guideName}.`,
     });
   } catch (err) {
-    // The slot reservation above already succeeded — don't roll that back
-    // over a session-sync hiccup, but this should never be silent, since a
-    // failure here is exactly the "invisible everywhere else" bug we're
-    // fixing.
+    // Do not report a successful join when the shared session record was not
+    // written. The slot reservation is still retained for manual recovery;
+    // Firestore rules should allow this service to write both records.
     console.error('[tourScheduleService] joinTour: failed to sync session record for guide/slot', guideId, slotIndex, err);
+    throw err;
   }
 }

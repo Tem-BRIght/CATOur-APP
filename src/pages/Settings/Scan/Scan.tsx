@@ -27,7 +27,7 @@ import { useProximityAIOptional } from '../../../context/Proximityaicontext';
 import { auth, firestore } from '../../../firebase';
 import { Destination } from '../../../types';
 import { createNotification, notifyVisitRecorded } from '../../../services/notificationsService';
-import { addTouristToSession } from '../../../services/sessionService';
+import { checkInTouristToSession } from '../../../services/sessionService';
 
 import './Scan.css';
 
@@ -261,25 +261,22 @@ const Scan: React.FC = () => {
           return;
         }
 
-        const alreadyJoined = sessionData.tourists?.some((tourist: { uid: string }) => tourist.uid === user.uid);
-        if (!alreadyJoined) {
-          await addTouristToSession(sessionId, {
-            uid: user.uid,
-            name: user.displayName || user.email || 'Tourist',
-            email: user.email || '',
-            joinedAt: new Date().toISOString(),
-          });
-          await createNotification({
-            userId: user.uid,
-            type: 'location',
-            title: 'Tour Joined',
-            message: `You successfully joined the tour at ${sessionData.destinationName || 'the selected destination'}.`,
-          });
-        }
-      } catch (err) {
+        await checkInTouristToSession(sessionId, user.uid);
+        await createNotification({
+          userId: user.uid,
+          type: 'location',
+          title: 'Attendance confirmed',
+          message: `Your attendance is confirmed for ${sessionData.destinationName || 'this tour'}.`,
+        });
+      } catch (err: any) {
         console.warn('[Scan] session join failed:', err);
         setScanResult('error');
-        setResultMsg('Unable to join this tour. Please try again.');
+        setResultMsg(err?.message || 'Unable to join this tour. Please try again.');
+        setTimeout(() => {
+          setScanResult(null);
+          setResultMsg('');
+          setLastScan('');
+        }, 3500);
         return;
       }
 

@@ -40,6 +40,16 @@ export interface GuideFeedbackInput {
   comment?: string;
 }
 
+export interface GuideFeedback extends GuideFeedbackInput {
+  id: string;
+  destinationId: string;
+  destinationName: string;
+  touristName: string;
+  categoryRatings: NonNullable<GuideFeedbackInput['categoryRatings']>;
+  comment: string;
+  createdAt?: unknown;
+}
+
 // ── Firestore refs ────────────────────────────────────────────────────────────
 
 const feedbackCol = () => collection(firestore, 'feedback');
@@ -73,10 +83,15 @@ export async function hasSubmittedFeedback(
  * Fetches the tourist's own feedback doc for this session (e.g. to pre-fill
  * the form if they navigate back to it before it's disabled).
  */
-export async function getFeedback(sessionId: string, touristId: string) {
+export async function getFeedback(
+  sessionId: string,
+  touristId: string,
+): Promise<GuideFeedback | null> {
   try {
     const snap = await getDoc(doc(feedbackCol(), feedbackDocId(sessionId, touristId)));
-    return snap.exists() ? { id: snap.id, ...snap.data() } : null;
+    return snap.exists()
+      ? { id: snap.id, ...(snap.data() as Omit<GuideFeedback, 'id'>) }
+      : null;
   } catch (err) {
     console.error('[feedbackService] getFeedback failed:', err);
     return null;
@@ -92,6 +107,13 @@ export async function getFeedback(sessionId: string, touristId: string) {
 export async function submitGuideFeedback(input: GuideFeedbackInput): Promise<void> {
   if (input.rating < 1 || input.rating > 5) {
     throw new Error('Rating must be between 1 and 5.');
+  }
+
+  const sessionSnap = await getDoc(doc(firestore, 'sessions', input.sessionId));
+  if (!sessionSnap.exists()) throw new Error('Tour session not found.');
+  const session = sessionSnap.data() as { status?: string; checkedInUids?: string[] };
+  if (session.status !== 'ended' || !session.checkedInUids?.includes(input.touristId)) {
+    throw new Error('Only checked-in tourists can submit feedback for an ended tour.');
   }
 
   const ref = doc(feedbackCol(), feedbackDocId(input.sessionId, input.touristId));

@@ -11,7 +11,6 @@ import {
   IonAvatar,
   IonImg,
   IonToggle,
-  IonAlert,
   IonModal,
   IonSpinner,
   IonToast,
@@ -22,6 +21,9 @@ import {
   personOutline,
   mailOutline,
   callOutline,
+  calendarOutline,
+  globeOutline,
+  locationOutline,
   notificationsOutline,
   lockClosedOutline,
   logOutOutline,
@@ -36,6 +38,7 @@ import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { firestore } from '../../firebase';
 import { useAuth } from '../../context/AuthContext';
 import './Profile.css';
+import FeedbackOverlay from '../../components/FeedbackOverlay';
 
 // ── Client-side image compression ──────────────────────────────────────────
 // Mirrors the approach in userProfileService.uploadProfilePicture: resize to
@@ -93,6 +96,10 @@ interface UserProfile {
   lastName?: string;
   phone?: string;
   photoUrl?: string;
+  age?: number | string;
+  birthdate?: string | number;
+  nationality?: string;
+  address?: string | { full?: string; region?: string; city?: string; district?: string; brgy?: string };
 }
 
 const Profile: React.FC = () => {
@@ -148,6 +155,10 @@ const Profile: React.FC = () => {
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [contact, setContact] = useState('');
+  const [age, setAge] = useState('');
+  const [birthdate, setBirthdate] = useState('');
+  const [nationality, setNationality] = useState('');
+  const [address, setAddress] = useState('');
 
   // ── Avatar upload state ──────────────────────────────────────
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -163,14 +174,44 @@ const Profile: React.FC = () => {
 
   const displayEmail = profile?.email || '';
   const displayContact = profile?.contactNumber || '';
+  const displayAge = profile?.age ? String(profile.age) : '';
+  const displayBirthdate = profile?.birthdate ? String(profile.birthdate) : '';
+  const displayNationality = profile?.nationality || '';
+  const displayAddress = typeof profile?.address === 'string'
+    ? profile.address
+    : profile?.address?.full || [profile?.address?.region, profile?.address?.city, profile?.address?.district, profile?.address?.brgy]
+      .filter(Boolean)
+      .join(', ');
 
   const openEdit = () => {
     setFullName(displayName);
     setEmail(displayEmail);
     setContact(displayContact);
+    setAge(displayAge);
+    setBirthdate(displayBirthdate);
+    setNationality(displayNationality);
+    setAddress(displayAddress);
     setAvatarDataUrl(null);
     setAvatarError('');
     setShowEditModal(true);
+  };
+
+  const handleBirthdateChange = (value: string) => {
+    setBirthdate(value);
+    if (!value) {
+      setAge('');
+      return;
+    }
+
+    const date = new Date(`${value}T00:00:00`);
+    if (Number.isNaN(date.getTime())) return;
+
+    const today = new Date();
+    let calculatedAge = today.getFullYear() - date.getFullYear();
+    const birthdayHasNotPassed = today.getMonth() < date.getMonth()
+      || (today.getMonth() === date.getMonth() && today.getDate() < date.getDate());
+    if (birthdayHasNotPassed) calculatedAge -= 1;
+    setAge(calculatedAge >= 0 ? String(calculatedAge) : '');
   };
 
   const pickAvatar = () => {
@@ -215,6 +256,10 @@ const Profile: React.FC = () => {
     const fullNameValue = fullName.trim();
     const emailValue = email.trim();
     const contactValue = contact.trim();
+    const ageValue = age.trim();
+    const birthdateValue = birthdate.trim();
+    const nationalityValue = nationality.trim();
+    const addressValue = address.trim();
     const nameParts = fullNameValue.split(/\s+/).filter(Boolean);
     const firstName = nameParts[0] || '';
     const lastName = nameParts.slice(1).join(' ');
@@ -237,6 +282,13 @@ const Profile: React.FC = () => {
           },
           email: emailValue,
           contactNumber: contactValue,
+          age: ageValue,
+          birthdate: birthdateValue,
+          nationality: nationalityValue,
+          address: {
+            ...(typeof profile?.address === 'object' ? profile.address : {}),
+            full: addressValue,
+          },
           img: imgValue,
         },
         { merge: true }
@@ -249,6 +301,10 @@ const Profile: React.FC = () => {
           lastName,
           email: emailValue,
           phone: contactValue,
+          age: ageValue,
+          birthdate: birthdateValue,
+          nationality: nationalityValue,
+          address: addressValue,
           photoUrl: imgValue,
         },
         { merge: true }
@@ -264,6 +320,10 @@ const Profile: React.FC = () => {
               firstName,
               lastName,
               phone: contactValue,
+              age: ageValue,
+              birthdate: birthdateValue,
+              nationality: nationalityValue,
+              address: addressValue,
               img: imgValue || null,
               photoUrl: imgValue,
             }
@@ -274,6 +334,10 @@ const Profile: React.FC = () => {
               firstName,
               lastName,
               phone: contactValue,
+              age: ageValue,
+              birthdate: birthdateValue,
+              nationality: nationalityValue,
+              address: addressValue,
               img: imgValue || null,
               photoUrl: imgValue,
             }
@@ -361,6 +425,36 @@ const Profile: React.FC = () => {
               <span className="info-value">{displayContact || '—'}</span>
             </div>
           </div>
+
+          <div className="settings-row">
+            <div className="info-icon-wrap">
+              <IonIcon icon={calendarOutline} />
+            </div>
+            <div className="info-text">
+              <span className="info-label">Age / Birthdate</span>
+              <span className="info-value">{displayAge || '—'}{displayBirthdate ? ` · ${displayBirthdate}` : ''}</span>
+            </div>
+          </div>
+
+          <div className="settings-row">
+            <div className="info-icon-wrap">
+              <IonIcon icon={globeOutline} />
+            </div>
+            <div className="info-text">
+              <span className="info-label">Nationality</span>
+              <span className="info-value">{displayNationality || '—'}</span>
+            </div>
+          </div>
+
+          <div className="settings-row">
+            <div className="info-icon-wrap">
+              <IonIcon icon={locationOutline} />
+            </div>
+            <div className="info-text">
+              <span className="info-label">Address</span>
+              <span className="info-value">{displayAddress || '—'}</span>
+            </div>
+          </div>
         </div>
 
         <div className="profile-section">
@@ -420,10 +514,11 @@ const Profile: React.FC = () => {
         isOpen={showEditModal}
         onDidDismiss={() => setShowEditModal(false)}
         className="edit-profile-modal"
-        breakpoints={[0, 0.65]}
-        initialBreakpoint={0.65}
+        breakpoints={[0.9]}
+        initialBreakpoint={0.9}
+        handle={false}
       >
-        <div className="edit-modal-content">
+        <IonContent className="edit-modal-content" scrollY>
           <div className="edit-modal-header">
             <h3>Edit Profile</h3>
             <IonButton fill="clear" className="edit-close-btn" onClick={() => setShowEditModal(false)}>
@@ -506,6 +601,40 @@ const Profile: React.FC = () => {
             </div>
           </div>
 
+          <div className="edit-field-row">
+            <div className="edit-field">
+              <span className="edit-field-label">Age</span>
+              <div className="edit-input-wrap">
+                <IonIcon icon={personOutline} className="edit-field-icon" />
+                <input className="edit-input" type="number" min="18" value={age} onChange={(e) => setAge(e.target.value)} placeholder="Age" />
+              </div>
+            </div>
+            <div className="edit-field">
+              <span className="edit-field-label">Birthdate</span>
+              <div className="edit-input-wrap">
+                <IonIcon icon={calendarOutline} className="edit-field-icon" />
+                <input className="edit-input" type="date" value={birthdate} onChange={(e) => handleBirthdateChange(e.target.value)} />
+              </div>
+            </div>
+          </div>
+
+          <div className="edit-field-row">
+            <div className="edit-field">
+              <span className="edit-field-label">Nationality</span>
+              <div className="edit-input-wrap">
+                <IonIcon icon={globeOutline} className="edit-field-icon" />
+                <input className="edit-input" value={nationality} onChange={(e) => setNationality(e.target.value)} placeholder="Nationality" />
+              </div>
+            </div>
+            <div className="edit-field">
+              <span className="edit-field-label">Address</span>
+              <div className="edit-input-wrap">
+                <IonIcon icon={locationOutline} className="edit-field-icon" />
+                <input className="edit-input" value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Address" />
+              </div>
+            </div>
+          </div>
+
           <IonButton
             expand="block"
             className="save-btn"
@@ -514,7 +643,7 @@ const Profile: React.FC = () => {
           >
             {saving ? <IonSpinner name="crescent" /> : 'Save Changes'}
           </IonButton>
-        </div>
+        </IonContent>
       </IonModal>
 
       <IonToast
@@ -526,7 +655,7 @@ const Profile: React.FC = () => {
         onDidDismiss={() => setAvatarError('')}
       />
 
-      <IonAlert
+      <FeedbackOverlay
         isOpen={showLogoutAlert}
         onDidDismiss={() => setShowLogoutAlert(false)}
         header="Log Out"

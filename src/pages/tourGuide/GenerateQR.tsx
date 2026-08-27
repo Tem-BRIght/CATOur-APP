@@ -38,7 +38,10 @@ const normalizeDateValue = (value: any): string => {
 
 const isSlotWithinQrWindow = (slot: Slot, now: number) => {
   const startMs = new Date(`${slot.date}T${slot.startTime}:00`).getTime();
-  const endMs = new Date(`${slot.date}T${slot.endTime}:00`).getTime();
+  const startDate = new Date(`${slot.date}T${slot.startTime}:00`);
+  const endDate = new Date(`${slot.date}T${slot.endTime}:00`);
+  if (endDate <= startDate) endDate.setDate(endDate.getDate() + 1);
+  const endMs = endDate.getTime();
 
   if (Number.isNaN(startMs) || Number.isNaN(endMs)) return false;
 
@@ -136,9 +139,14 @@ const GenerateQR: React.FC = () => {
 
         const now = Date.now();
         const today = new Date().toLocaleDateString('en-CA');
-        const activeSlots = sortedSlots.filter((slot) =>
-          slot.date === today && isSlotWithinQrWindow(slot, now)
-        );
+        const activeSlots = sortedSlots.filter((slot) => {
+          const startDate = new Date(`${slot.date}T${slot.startTime}:00`);
+          const endDate = new Date(`${slot.date}T${slot.endTime}:00`);
+          if (endDate <= startDate) endDate.setDate(endDate.getDate() + 1);
+          const endDateString = endDate.toLocaleDateString('en-CA');
+          const isTodaySlot = slot.date === today || endDateString === today;
+          return isTodaySlot && isSlotWithinQrWindow(slot, now);
+        });
 
         if (activeSlots.length > 0) {
           const firstActive = {

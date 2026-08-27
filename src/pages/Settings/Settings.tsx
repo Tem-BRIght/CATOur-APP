@@ -9,7 +9,6 @@ import {
   IonTitle,
   IonToolbar,
   IonIcon,
-  IonAlert,
 } from '@ionic/react';
 import { useIonRouter, useIonViewWillEnter } from '@ionic/react';
 import {
@@ -39,10 +38,12 @@ import { useAuth } from '../../context/AuthContext';
 import { getProfileCompletion, UserProfile } from '../../services/userProfileService';
 import { getProfilePicCache } from '../../utils/profileImageStorage';
 import './Settings.css';
+import FeedbackOverlay from '../../components/FeedbackOverlay';
 
 const Settings: React.FC = () => {
   const router = useIonRouter();
   const { user, logout, isLoading: authLoading } = useAuth();
+  const hasPasswordProvider = user?.providerData.some((provider) => provider.providerId === 'password') ?? false;
 
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [showLogoutAlert, setShowLogoutAlert] = useState(false);
@@ -145,8 +146,7 @@ const Settings: React.FC = () => {
     if (!user?.uid || deletingAccount) return;
     setDeletingAccount(true);
     try {
-      const deleteAfter = new Date();
-      deleteAfter.setDate(deleteAfter.getDate() + 30);
+      const deleteAfter = new Date(Date.now() + 30 * 1000);
       await setDoc(doc(firestore, 'users', user.uid), {
         deletionStatus: 'scheduled',
         deletionAt: Timestamp.fromDate(deleteAfter),
@@ -288,7 +288,9 @@ const Settings: React.FC = () => {
           <p className="section-title">Privacy & Security</p>
           <div className="card">
             <Item icon={shieldCheckmarkOutline} color="cyan" label="Privacy Settings" onClick={() => onItemClick('Privacy Settings')} />
-            <Item icon={lockClosedOutline} color="blue" label="Change Password" onClick={() => onItemClick('Change Password')} />
+            {hasPasswordProvider && (
+              <Item icon={lockClosedOutline} color="blue" label="Change Password" onClick={() => onItemClick('Change Password')} />
+            )}
           </div>
         </div>
 
@@ -311,7 +313,7 @@ const Settings: React.FC = () => {
             {deletionDate ? (
               <div className="account-deletion-notice">
                 <strong>Scheduled for deletion</strong>
-                <span>Your account will be permanently deleted on {deletionDate.toLocaleDateString()}.</span>
+                <span>Your account will be permanently deleted on {deletionDate.toLocaleString()}.</span>
                 <button type="button" onClick={handleCancelAccountDeletion} disabled={deletingAccount}>
                   {deletingAccount ? 'Restoring…' : 'Cancel deletion'}
                 </button>
@@ -343,7 +345,7 @@ const Settings: React.FC = () => {
         <div style={{ height: '32px' }} />
 
         {/* ── Logout confirmation ─────────────────────────────────────────── */}
-        <IonAlert
+        <FeedbackOverlay
           isOpen={showLogoutAlert}
           onDidDismiss={() => setShowLogoutAlert(false)}
           header="Confirm Logout"
@@ -353,11 +355,11 @@ const Settings: React.FC = () => {
             { text: 'Logout', handler: handleLogout },
           ]}
         />
-        <IonAlert
+        <FeedbackOverlay
           isOpen={showDeleteAccountAlert}
           onDidDismiss={() => setShowDeleteAccountAlert(false)}
           header="Schedule account deletion?"
-          message="Your account will remain recoverable for 30 days, then be permanently deleted."
+          message="Your account will remain recoverable for 30 seconds, then be permanently deleted."
           buttons={[
             { text: 'Cancel', role: 'cancel' },
             { text: deletingAccount ? 'Scheduling…' : 'Schedule deletion', role: 'destructive', handler: handleDeleteAccount },

@@ -69,6 +69,26 @@
   margin: 0.3rem 0;
 }
 
+.ts-guide-details {
+  display: grid;
+  gap: 0.35rem;
+  margin: 0.7rem 0 0;
+  font-size: 0.82rem;
+  line-height: 1.35;
+  opacity: 0.88;
+}
+
+.ts-guide-details span {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.45rem;
+}
+
+.ts-guide-details ion-icon {
+  flex: 0 0 auto;
+  margin-top: 0.1rem;
+}
+
 .ts-datetime {
   display: flex;
   gap: 1.5rem;

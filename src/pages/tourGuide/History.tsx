@@ -83,20 +83,16 @@ const TourInfoBlock: React.FC<{ session: any }> = ({ session }) => (
     <div className="modal-tour-info-divider" />
 
     <div className="modal-tour-info-row">
-      <IonIcon icon={personOutline} className="modal-tour-info-icon" />
-      <div className="modal-tour-info-text">
-        <span className="modal-tour-info-label">Tour Guide Profile</span>
-        <span className="modal-tour-info-value">{session.inCharge ?? session.guideName ?? '—'}</span>
-      </div>
-    </div>
-
-    <div className="modal-tour-info-divider" />
-
-    <div className="modal-tour-info-row">
       <IonIcon icon={cardOutline} className="modal-tour-info-icon" />
       <div className="modal-tour-info-text">
         <span className="modal-tour-info-label">ID</span>
-        <span className="modal-tour-info-value modal-tour-info-id">{session.tourId ?? '—'}</span>
+        <span
+          className={`modal-tour-info-value modal-tour-info-id ${
+            session.tourId ? '' : 'modal-tour-info-id--empty'
+          }`}
+        >
+          {session.tourId || 'Not assigned'}
+        </span>
       </div>
     </div>
 
@@ -151,7 +147,7 @@ const History: React.FC = () => {
             const tourists = Array.isArray(data.tourists)
               ? data.tourists.map((tourist: any) => ({
                   ...tourist,
-                  status: reviewedKeys.has(`${d.id}_${tourist.uid}`) ? 'Reviewed' : 'Pending',
+                  status: tourist.status || (reviewedKeys.has(`${d.id}_${tourist.uid}`) ? 'Reviewed' : 'Pending'),
                 }))
               : [];
 

@@ -34,9 +34,22 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import React, { useState } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useHistory } from 'react-router-dom';
 import { IonIcon } from '@ionic/react';
-import { close, playSkipForward, pause as pauseIcon, mic, refresh, mapOutline, expandOutline, contractOutline } from 'ionicons/icons';
+import {
+  close,
+  playSkipForward,
+  pause as pauseIcon,
+  mic,
+  refresh,
+  mapOutline,
+  expandOutline,
+  contractOutline,
+  chatbubblesOutline,
+  timeOutline,
+  restaurantOutline,
+  informationCircleOutline,
+} from 'ionicons/icons';
 import { useProximityAIOptional } from '../../context/Proximityaicontext';
 import { useSpeechRecognition } from '../../hooks/useSpeechRecognition';
 import { IntegratedRouteMap } from './AIGuide';
@@ -186,6 +199,36 @@ const ProximityAITalkingOverlay: React.FC = () => {
     }
   };
 
+  const history = useHistory();
+
+  const handleChipClick = async (chipPrompt: string) => {
+    if (isLoading || micListening) return;
+    if (typeof proximityAI.askQuestion === 'function') {
+      await proximityAI.askQuestion(chipPrompt);
+    }
+  };
+
+  const handleOpenInAIGuide = () => {
+    const query = destination
+      ? `Tell me more about ${destination.title}`
+      : 'Recommend must-visit places in Pasig';
+    safeDismiss();
+    history.push(`/AIGuide?q=${encodeURIComponent(query)}`);
+  };
+
+  const suggestionChips = destination
+    ? [
+        { label: 'Hours & Fees', prompt: `What are the opening hours and entrance fees for ${destination.title}?`, icon: timeOutline },
+        { label: "What's nearby?", prompt: `What other attractions or spots are near ${destination.title}?`, icon: mapOutline },
+        { label: 'History & Tips', prompt: `Tell me a quick historical highlight and tips for ${destination.title}.`, icon: informationCircleOutline },
+        { label: 'Where to eat', prompt: `Where are good places to eat near ${destination.title}?`, icon: restaurantOutline },
+      ]
+    : [
+        { label: 'Top 5 spots', prompt: 'What are the top 5 must-visit places in Pasig City?', icon: mapOutline },
+        { label: 'Local food spots', prompt: 'What are the most popular food spots in Pasig City?', icon: restaurantOutline },
+        { label: 'Heritage sites', prompt: 'Which historical landmarks and churches can I visit in Pasig?', icon: informationCircleOutline },
+      ];
+
   const handlePressStart = (e: React.PointerEvent) => {
     e.preventDefault();
     if (micListening) return;
@@ -220,10 +263,9 @@ const ProximityAITalkingOverlay: React.FC = () => {
         >
           <IonIcon icon={close} />
         </button>
-          <img className="ai-talking-character" src={ALI_CHARACTER_IMAGE} alt="ALI" />
+        <img className="ai-talking-character" src={ALI_CHARACTER_IMAGE} alt="ALI" />
 
         <div className="ai-talking-bubbles">
-
           <div className={`ai-talking-bubble narration${isSpeaking ? ' speaking' : ''}`}>
             {isLoading ? (
               <div className="ai-talking-loading">
@@ -236,6 +278,23 @@ const ProximityAITalkingOverlay: React.FC = () => {
               <p>{narration}</p>
             )}
           </div>
+
+          {/* Quick Action Prompt Chips */}
+          {!isLoading && !micListening && (
+            <div className="ai-talking-chips" role="toolbar" aria-label="Suggested questions">
+              {suggestionChips.map((chip, idx) => (
+                <button
+                  key={idx}
+                  className="ai-talking-chip"
+                  onClick={() => handleChipClick(chip.prompt)}
+                  aria-label={chip.label}
+                >
+                  <IonIcon icon={chip.icon} aria-hidden="true" />
+                  <span>{chip.label}</span>
+                </button>
+              ))}
+            </div>
+          )}
 
           {micListening && (
             <div className="ai-talking-bubble listening">
@@ -310,7 +369,18 @@ const ProximityAITalkingOverlay: React.FC = () => {
             >
               <IonIcon icon={mapOutline} />
             </button>
+          </div>
 
+          <div className="ai-talking-guide-row">
+            <button
+              className="ai-talking-chat-btn"
+              onClick={handleOpenInAIGuide}
+              disabled={isLoading}
+              aria-label="Open conversation in full AI Guide"
+            >
+              <IonIcon icon={chatbubblesOutline} />
+              <span>Ask ALI in Full AI Guide</span>
+            </button>
           </div>
         </div>
 

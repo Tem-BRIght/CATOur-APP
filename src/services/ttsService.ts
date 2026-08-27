@@ -30,14 +30,70 @@ function setState(patch: Partial<TtsState>) {
   listeners.forEach(l => l(state));
 }
 
-/** Strip markdown so TTS reads clean text — same rules used in AIGuide.tsx */
+/**
+ * Strip markdown and format lists into natural spoken prose transitions
+ * so TTS speaks naturally (e.g. "First, ... Next, ... After that, ... Then, ... And finally, ...")
+ * rather than reading raw numbers or symbols.
+ */
 export function stripMarkdown(text: string): string {
-  return text
+  if (!text) return '';
+
+  // 1. Remove markdown bold, italic, code, headings
+  let cleaned = text
     .replace(/\*\*(.+?)\*\*/g, '$1')
     .replace(/\*(.+?)\*/g, '$1')
     .replace(/`(.+?)`/g, '$1')
+    .replace(/#{1,6}\s+/g, '');
+
+  const spokenTransitions = ['First', 'Next', 'After that', 'Then', 'Also', 'Following that', 'And finally'];
+
+  // 2. Multi-line numbered list conversion: "1. Immaculate..." or "1) Immaculate..."
+  const lines = cleaned.split('\n');
+  const numberedLineIndices: number[] = [];
+  lines.forEach((line, idx) => {
+    if (/^\s*\d+[\.\)]\s+/.test(line)) {
+      numberedLineIndices.push(idx);
+    }
+  });
+
+  if (numberedLineIndices.length >= 2) {
+    const total = numberedLineIndices.length;
+    numberedLineIndices.forEach((lineIdx, i) => {
+      let transition = spokenTransitions[Math.min(i, spokenTransitions.length - 2)];
+      if (i === total - 1 && total > 2) {
+        transition = 'And finally';
+      }
+      lines[lineIdx] = lines[lineIdx].replace(/^\s*\d+[\.\)]\s+/, `${transition}, `);
+    });
+    cleaned = lines.join('\n');
+  } else {
+    // 3. Inline numbered list conversion: " 1) ... 2) ... 3) ..."
+    let inlineCount = 0;
+    const inlineMatches = cleaned.match(/(?:^|\s)\d+[\.\)]\s+/g);
+    if (inlineMatches && inlineMatches.length >= 2) {
+      const total = inlineMatches.length;
+      cleaned = cleaned.replace(/(?:^|\s)\d+[\.\)]\s+/g, (match) => {
+        let transition = spokenTransitions[Math.min(inlineCount, spokenTransitions.length - 2)];
+        if (inlineCount === total - 1 && total > 2) {
+          transition = 'And finally';
+        }
+        inlineCount += 1;
+        const leadingSpace = match.startsWith(' ') ? ' ' : '';
+        return `${leadingSpace}${transition}, `;
+      });
+    } else {
+      cleaned = cleaned.replace(/^\s*\d+[\.\)]\s+/gm, '');
+    }
+  }
+
+  // 4. Clean bullets, dashes, and extra whitespace
+  return cleaned
     .replace(/^[-*•]\s+/gm, '')
-    .replace(/^\d+\.\s+/gm, '')
+    .replace(/\s*–\s*/g, ', ')
+    .replace(/\s*—\s*/g, ', ')
+    .replace(/\n+/g, '. ')
+    .replace(/\s{2,}/g, ' ')
+    .replace(/\.\s*\./g, '.')
     .trim();
 }
 

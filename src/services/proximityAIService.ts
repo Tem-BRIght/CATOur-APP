@@ -138,6 +138,15 @@ function writeNarrationCache(destId: string, text: string): void {
   }
 }
 
+/**
+ * Velocity check: ignore geofence arrivals if the device reports moving
+ * faster than ~60 km/h (17 m/s) — avoids firing narrations while driving on a highway.
+ */
+export function isArrivalVelocityValid(speedMps?: number | null): boolean {
+  if (speedMps == null || Number.isNaN(speedMps) || speedMps < 0) return true;
+  return speedMps <= 17; // ~61.2 km/h
+}
+
 function buildFactSheet(dest: Destination): string {
   const d = dest as any;
   const lines: string[] = [];
@@ -147,18 +156,23 @@ function buildFactSheet(dest: Destination): string {
   const desc = d.desc || d.description;
   if (desc) lines.push(`Description: ${desc}`);
   if (d.hours) lines.push(`Hours: ${d.hours}`);
-  if (d.admission) lines.push(`Admission: ${d.admission}`);
+  if (d.admission) lines.push(`Admission/Fee: ${d.admission}`);
   if (d.suitableFor) lines.push(`Good for: ${d.suitableFor}`);
+  if (d.bestTimeToVisit) lines.push(`Best time to visit: ${d.bestTimeToVisit}`);
+  if (d.whatToBring) lines.push(`What to bring: ${d.whatToBring}`);
+  if (d.parking) lines.push(`Parking: ${d.parking}`);
   if (Array.isArray(d.goodFor) && d.goodFor.length) lines.push(`Tags: ${d.goodFor.join(', ')}`);
+  if (Array.isArray(d.nearbyAttractions) && d.nearbyAttractions.length) {
+    lines.push(`Nearby: ${d.nearbyAttractions.map((n: any) => n.name || n).join(', ')}`);
+  }
   if (d.address) lines.push(`Address: ${d.address}`);
   return lines.join('\n');
 }
 
 /**
  * generateArrivalNarration
- * CHANGED: no more direct fetch() to Groq with an exposed key — routes
- * through the groqChat Cloud Function. Falls back to a templated sentence
- * if the call fails (network issue, function down, etc.), same as before.
+ * Spoken arrival intro for the Proximity AI overlay.
+ * Uses Groq via the groqChat Cloud Function, with fallback to destination summary.
  */
 export async function generateArrivalNarration(
   dest: Destination,
@@ -171,14 +185,16 @@ export async function generateArrivalNarration(
     if (cached) return cached;
   }
 
-  const fallback = `Welcome to ${name}! I hope you enjoy your visit — feel free to open the AI Guide any time you have questions about this place.`;
+  const fallback = `Welcome to ${name}! I'm glad you made it here. Take a look around, and feel free to ask me anything about its history, opening hours, or what to see nearby.`;
 
   try {
     const systemPrompt =
-      'You are a warm, knowledgeable local tour guide speaking OUT LOUD to a tourist who has just arrived ' +
-      'at a destination. Greet them and share 2-4 short, natural spoken sentences about the place, using ONLY ' +
-      'the facts provided below. Do not invent facts, prices, or hours that are not given. No markdown, no lists, ' +
-      'no headings — plain spoken language only, as if welcoming them in person.';
+      'You are ALI, a warm, knowledgeable local tour guide for the CATOUR app in Pasig City. ' +
+      'You are speaking OUT LOUD to a tourist who has just arrived in person at this destination. ' +
+      'Greet them warmly and share 2-4 short, natural spoken sentences highlighting what makes this place special, ' +
+      'its quick history, and a helpful tip for exploring it. Use ONLY the facts provided below; do not invent ' +
+      'prices, hours, or details that are not given. Plain spoken English or natural Taglish only — ' +
+      'STRICTLY NO markdown, NO asterisks, NO bullet points, NO headings since this is read aloud via speech synthesis.';
 
     const userPrompt = `Facts about the destination:\n${buildFactSheet(dest)}`;
 
@@ -187,8 +203,8 @@ export async function generateArrivalNarration(
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt },
       ],
-      temperature: 0.7,
-      max_tokens: 180,
+      temperature: 0.65,
+      max_tokens: 190,
       top_p: 0.9,
     });
 

@@ -43,9 +43,9 @@ service cloud.firestore {
     }
 
     match /users/{uid} {
-      allow create: if isOwner(uid);
+      allow create: if isOwner(uid) || isAdmin();
       allow read, update: if isOwner(uid) || isAdmin();
-      allow delete: if false;
+      allow delete: if isAdmin();
     }
 
     match /tourGuides/{uid} {
@@ -87,12 +87,12 @@ service cloud.firestore {
 
     match /destinations/{destinationId}/reviews/{reviewId} {
       allow read: if true;
-      allow create: if isOwner(reviewId) &&
+      allow create: if isAdmin() || (isOwner(reviewId) &&
         request.resource.data.userId == request.auth.uid &&
-        request.resource.data.destinationId == destinationId;
-      allow update: if isOwner(reviewId) &&
+        request.resource.data.destinationId == destinationId);
+      allow update: if isAdmin() || (isOwner(reviewId) &&
         request.resource.data.userId == request.auth.uid &&
-        request.resource.data.destinationId == destinationId;
+        request.resource.data.destinationId == destinationId);
       allow update: if isSignedIn() &&
         resource.data.allowVenueReply == true &&
         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['replies']) &&
@@ -101,7 +101,7 @@ service cloud.firestore {
          (resource.data.replies is list &&
           request.resource.data.replies.size() == resource.data.replies.size() + 1)) &&
         request.resource.data.replies[request.resource.data.replies.size() - 1].userId == request.auth.uid;
-      allow delete: if isOwner(reviewId);
+      allow delete: if isAdmin() || isOwner(reviewId);
     }
 
     match /users/{uid}/reviews/{reviewId} {
@@ -141,11 +141,35 @@ service cloud.firestore {
         request.resource.data.touristUids.size() == resource.data.touristUids.size() + 1 &&
         request.resource.data.tourists.size() == resource.data.tourists.size() + 1
       ) || (
+        isSignedIn() &&
+        resource.data.touristUids is list && resource.data.touristUids.hasAny([request.auth.uid]) &&
+        resource.data.cancelledUids is list && resource.data.cancelledUids.hasAny([request.auth.uid]) &&
+        request.resource.data.touristUids is list &&
+        request.resource.data.touristUids.size() == resource.data.touristUids.size() &&
+        request.resource.data.tourists is list &&
+        request.resource.data.tourists.size() == resource.data.tourists.size() + 1 &&
+        request.resource.data.cancelledUids is list &&
+        !request.resource.data.cancelledUids.hasAny([request.auth.uid]) &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['tourists', 'touristUids', 'cancelledUids'])
+      ) || (
         isSignedIn() && resource.data.status == 'pending' &&
         resource.data.touristUids is list && resource.data.touristUids.hasAny([request.auth.uid]) &&
-        request.resource.data.status == 'Cancelled' &&
-        request.resource.data.cancelReason is string && request.resource.data.cancelReason.size() > 0 &&
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'cancelReason', 'cancelledAt'])
+        request.resource.data.touristUids is list &&
+        request.resource.data.tourists is list &&
+        request.resource.data.tourists.size() == resource.data.tourists.size() &&
+        request.resource.data.cancelledUids is list &&
+        (!('cancelledUids' in resource.data) || request.resource.data.cancelledUids.hasAll(resource.data.cancelledUids)) &&
+        request.resource.data.cancelledUids.hasAny([request.auth.uid]) &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['tourists', 'touristUids', 'cancelledUids', 'checkedInUids'])
+      ) || (
+        isSignedIn() &&
+        resource.data.touristUids is list &&
+        resource.data.touristUids.hasAny([request.auth.uid]) &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['checkedInUids']) &&
+        request.resource.data.checkedInUids is list &&
+        ((!('checkedInUids' in resource.data) && request.resource.data.checkedInUids.size() > 0) ||
+         (resource.data.checkedInUids is list && request.resource.data.checkedInUids.hasAll(resource.data.checkedInUids))) &&
+        request.resource.data.checkedInUids.hasAny([request.auth.uid])
       );
       allow delete: if isSignedIn() && (resource.data.guideId == request.auth.uid || isAdmin());
     }
@@ -172,7 +196,12 @@ service cloud.firestore {
       allow create: if isSignedIn() && (
         !('userId' in request.resource.data) ||
         request.resource.data.userId == request.auth.uid ||
-        isAdmin()
+        isAdmin() ||
+        (request.resource.data.sessionId is string &&
+         exists(/databases/$(database)/documents/sessions/$(request.resource.data.sessionId)) &&
+         get(/databases/$(database)/documents/sessions/$(request.resource.data.sessionId)).data.guideId == request.auth.uid &&
+         get(/databases/$(database)/documents/sessions/$(request.resource.data.sessionId)).data.checkedInUids is list &&
+         get(/databases/$(database)/documents/sessions/$(request.resource.data.sessionId)).data.checkedInUids.hasAny([request.resource.data.userId]))
       );
       allow update, delete: if isAdmin() || (
         isSignedIn() && resource.data.userId == request.auth.uid
@@ -243,8 +272,13 @@ service cloud.firestore {
 
     match /feedback/{feedbackId} {
       allow read: if true;
-      allow create: if isSignedIn() && request.resource.data.touristId == request.auth.uid;
-      allow update, delete: if isSignedIn() && (resource.data.touristId == request.auth.uid || isAdmin());
+      allow create: if isAdmin() || (isSignedIn() && request.resource.data.touristId == request.auth.uid &&
+        request.resource.data.sessionId is string &&
+        exists(/databases/$(database)/documents/sessions/$(request.resource.data.sessionId)) &&
+        get(/databases/$(database)/documents/sessions/$(request.resource.data.sessionId)).data.status == 'ended' &&
+        get(/databases/$(database)/documents/sessions/$(request.resource.data.sessionId)).data.checkedInUids is list &&
+        get(/databases/$(database)/documents/sessions/$(request.resource.data.sessionId)).data.checkedInUids.hasAny([request.auth.uid]));
+      allow update, delete: if isAdmin() || (isSignedIn() && resource.data.touristId == request.auth.uid);
     }
 
     match /activityLog/{activityId} {
@@ -270,7 +304,7 @@ service cloud.firestore {
          request.resource.data.diff(resource.data).affectedKeys().hasOnly([
            'lastMessage', 'lastMessageAt', 'lastMessageBySenderRole', 'unreadByUser', 'status'
          ]));
-      allow delete: if isSuperAdmin() || isOwner(resource.data.userId);
+      allow delete: if isAdmin() || isOwner(resource.data.userId);
 
       match /messages/{messageId} {
         allow read: if isAdmin() || isOwner(get(/databases/$(database)/documents/supportTickets/$(ticketId)).data.userId);

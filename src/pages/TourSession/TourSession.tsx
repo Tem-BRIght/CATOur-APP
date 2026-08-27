@@ -12,13 +12,14 @@ import {
   IonIcon,
   IonButton,
 } from '@ionic/react';
-import { personOutline, calendarOutline, timeOutline, mapOutline, checkmarkCircle, navigateCircleOutline } from 'ionicons/icons';
+import { personOutline, calendarOutline, timeOutline, mapOutline, checkmarkCircle, navigateCircleOutline, briefcaseOutline, locationOutline } from 'ionicons/icons';
 import { useAuth } from '../../context/AuthContext';
-import { getSession, subscribeSession, addTouristToSession } from '../../services/sessionService';
+import { getSession, subscribeSession } from '../../services/sessionService';
 import type { TourSession } from '../../services/sessionService';
 import { collection, getDocs, documentId, query, where } from 'firebase/firestore';
 import { firestore } from '../../firebase';
-import { LoadScript, GoogleMap, MarkerF } from '@react-google-maps/api';
+import { DirectionsRenderer, LoadScript, GoogleMap, MarkerF } from '@react-google-maps/api';
+import { useUserLocation } from '../../services/useUserLocation';
 import './TourSession.css';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -61,9 +62,12 @@ interface LiveLatLng {
 const TourStopsMap: React.FC<{
   stops: TourStop[];
   guideLocation?: LiveLatLng | null;
+  routeOrigin?: LiveLatLng | null;
+  routeDestination?: LiveLatLng | null;
   height?: number;
-}> = ({ stops, guideLocation, height = 200 }) => {
+}> = ({ stops, guideLocation, routeOrigin, routeDestination, height = 200 }) => {
   const mapRef = useRef<google.maps.Map | null>(null);
+  const [directions, setDirections] = useState<google.maps.DirectionsResult | null>(null);
   const points = [
     ...stops.map((stop) => ({ lat: stop.lat, lng: stop.lng })),
     ...(guideLocation ? [guideLocation] : []),
@@ -93,6 +97,22 @@ const TourStopsMap: React.FC<{
   };
 
   useEffect(() => {
+    if (!routeOrigin || !routeDestination || !window.google?.maps) {
+      setDirections(null);
+      return;
+    }
+
+    new google.maps.DirectionsService().route({
+      origin: routeOrigin,
+      destination: routeDestination,
+      travelMode: google.maps.TravelMode.WALKING,
+    }, (result, status) => {
+      if (status === google.maps.DirectionsStatus.OK && result) setDirections(result);
+      else setDirections(null);
+    });
+  }, [routeOrigin?.lat, routeOrigin?.lng, routeDestination?.lat, routeDestination?.lng]);
+
+  useEffect(() => {
     fitMapToPoints();
   }, [points.map((point) => `${point.lat.toFixed(5)}:${point.lng.toFixed(5)}`).join('|')]);
 
@@ -112,6 +132,7 @@ const TourStopsMap: React.FC<{
           }}
           onLoad={handleMapLoad}
         >
+          {directions && <DirectionsRenderer directions={directions} options={{ suppressMarkers: true }} />}
           {stops.map((stop, i) => (
             <MarkerF
               key={stop.id || `${stop.name}-${i}`}
@@ -148,6 +169,7 @@ const TourSession: React.FC = () => {
   const { sessionId } = useParams<RouteParams>();
   const history = useHistory();
   const { currentUser } = useAuth();
+  const { coords: userCoords } = useUserLocation();
 
   const [session, setSession] = useState<TourSession | null>(null);
   const [loading, setLoading] = useState(true);
@@ -181,6 +203,11 @@ const TourSession: React.FC = () => {
     if (!live || typeof live.lat !== 'number' || typeof live.lng !== 'number') return null;
     return { lat: live.lat, lng: live.lng };
   })();
+  const isCheckedIn = !!currentUser && !!session?.checkedInUids?.includes(currentUser.uid);
+  const nextStop = tourStops.find((stop) => !(session?.completedStops || []).includes(stop.id));
+  const routeOrigin = session?.status === 'active' && isCheckedIn && userCoords
+    ? { lat: userCoords.latitude, lng: userCoords.longitude }
+    : null;
 
   // ── Load pinned destinations for this session's tour type ──
   // Real schema (confirmed from the admin's destinations.page.ts):
@@ -246,25 +273,10 @@ const TourSession: React.FC = () => {
     return () => { cancelled = true; };
   }, [session]);
 
-  // ── Auto-join if user is not yet in the tourists list ──────
+  // ── Resolve registration from the session record ──────
   useEffect(() => {
     if (!session || !currentUser) return;
-    if (session.status === 'ended') return;
-
-    const isInList = session.tourists.some(t => t.uid === currentUser.uid);
-    if (!isInList) {
-      const tourist = {
-        uid: currentUser.uid,
-        name: currentUser.displayName || 'Tourist',
-        email: currentUser.email || '',
-        joinedAt: new Date().toISOString(),
-      };
-      addTouristToSession(sessionId, tourist)
-        .then(() => setJoined(true))
-        .catch(err => console.error('Failed to join session:', err));
-    } else {
-      setJoined(true);
-    }
+    setJoined(Array.isArray(session.touristUids) && session.touristUids.includes(currentUser.uid));
   }, [session, currentUser, sessionId]);
 
   // ── Auto-redirect to the feedback form once the guide ends the tour ──
@@ -281,6 +293,7 @@ const TourSession: React.FC = () => {
     if (hasRedirectedRef.current) return;
     // Don't redirect the guide's own view of the session, only tourists.
     if (currentUser && session.guideId && currentUser.uid === session.guideId) return;
+    if (!currentUser || !session.checkedInUids?.includes(currentUser.uid)) return;
 
     hasRedirectedRef.current = true;
     setEndingRedirect(true);
@@ -333,6 +346,12 @@ const TourSession: React.FC = () => {
     );
   }
 
+  const guideProfile = session.guideProfile;
+  const guideAddress = [guideProfile?.address, guideProfile?.barangay, guideProfile?.district, guideProfile?.city, guideProfile?.region]
+    .filter(Boolean)
+    .join(', ');
+  const guideBirthdate = guideProfile?.birthdate || guideProfile?.dateOfBirth;
+
   const statusText = session.status === 'pending'
     ? 'Not started'
     : session.status === 'active'
@@ -360,6 +379,12 @@ const TourSession: React.FC = () => {
           <p className="ts-guide">
             <IonIcon icon={personOutline} /> Tour Guide Profile: {session.guideName}
           </p>
+          <div className="ts-guide-details">
+            <span><IonIcon icon={briefcaseOutline} /> Age: {guideProfile?.age || 'Not provided'}</span>
+            <span><IonIcon icon={calendarOutline} /> Birthday: {guideBirthdate || 'Not provided'}</span>
+            <span><IonIcon icon={locationOutline} /> Address: {guideAddress || 'Not provided'}</span>
+            <span><IonIcon icon={personOutline} /> Nationality: {guideProfile?.nationality || 'Not provided'}</span>
+          </div>
           <div className="ts-datetime">
             <span><IonIcon icon={calendarOutline} /> {formatDate(session.startTime)}</span>
             <span><IonIcon icon={timeOutline} /> {formatTime(session.startTime)}</span>
@@ -368,7 +393,7 @@ const TourSession: React.FC = () => {
         </div>
 
         {/* Pinned destinations for this tour + guide's live location */}
-        {(tourStops.length > 0 || guideLocation) && (
+        {isCheckedIn && (tourStops.length > 0 || guideLocation) && (
           <div className="ts-section">
             <div className="ts-section-title">
               <IonIcon icon={mapOutline} />
@@ -385,7 +410,12 @@ const TourSession: React.FC = () => {
               </p>
             )}
 
-            <TourStopsMap stops={tourStops} guideLocation={guideLocation} />
+            <TourStopsMap
+              stops={tourStops}
+              guideLocation={guideLocation}
+              routeOrigin={routeOrigin}
+              routeDestination={nextStop ? { lat: nextStop.lat, lng: nextStop.lng } : null}
+            />
 
             {tourStops.length > 0 && (
               <ul className="ts-stops-list">

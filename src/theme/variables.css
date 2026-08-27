@@ -5,6 +5,19 @@ http://ionicframework.com/docs/theming/ */
 
 :root {
   --catour-brand-blue: #1aa7ff;
+  --catour-navy: #0d2f6e;
+  --catour-sky: #1a8fe3;
+  --catour-surface: #ffffff;
+  --catour-page: #f0f6fd;
+  --catour-border: #dde8f5;
+  --catour-text-muted: #5a6a7a;
+  --catour-space-page: clamp(1rem, 4vw, 2rem);
+  --catour-radius-card: 1rem;
+  --catour-touch-target: 44px;
+  --catour-safe-top: env(safe-area-inset-top, 0px);
+  --catour-safe-right: env(safe-area-inset-right, 0px);
+  --catour-safe-bottom: env(safe-area-inset-bottom, 0px);
+  --catour-safe-left: env(safe-area-inset-left, 0px);
   --ion-font-family: 'Sora', 'Segoe UI', sans-serif;
 }
 
@@ -21,6 +34,31 @@ ion-page,
 
 body {
   color: #0f172a;
+  min-width: 320px;
+  background: var(--catour-page);
+}
+
+.safe-area-page {
+  padding-top: var(--catour-safe-top);
+  padding-right: var(--catour-safe-right);
+  padding-bottom: var(--catour-safe-bottom);
+  padding-left: var(--catour-safe-left);
+}
+
+.safe-area-bottom {
+  padding-bottom: var(--catour-safe-bottom);
+}
+
+.touch-target {
+  min-width: var(--catour-touch-target);
+  min-height: var(--catour-touch-target);
+}
+
+ion-content.safe-area-content {
+  --padding-top: var(--catour-safe-top);
+  --padding-end: var(--catour-safe-right);
+  --padding-bottom: var(--catour-safe-bottom);
+  --padding-start: var(--catour-safe-left);
 }
 
 h1,

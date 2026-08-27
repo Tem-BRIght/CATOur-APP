@@ -3,7 +3,7 @@ import { Capacitor } from '@capacitor/core';
 import { useHistory } from 'react-router-dom';
 import {
   IonContent, IonPage, IonButton, IonInput,
-  IonItem, IonLabel, IonIcon, IonLoading, IonAlert,
+  IonItem, IonLabel, IonIcon, IonLoading,
 } from '@ionic/react';
 import { mailOutline, lockClosedOutline, eyeOutline, eyeOffOutline } from 'ionicons/icons';
 import { Link } from 'react-router-dom';
@@ -22,6 +22,7 @@ import { auth, firestore } from '../../firebase';
 import { useAuth } from '../../context/AuthContext';
 import { useSignup } from '../../context/SignupContext';
 import './Login.css';
+import FeedbackOverlay from '../../components/FeedbackOverlay';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -406,7 +407,7 @@ const Login: React.FC = () => {
 
         <IonLoading isOpen={showLoading} message="Logging you in..." />
 
-        <IonAlert
+        <FeedbackOverlay
           isOpen={showAlert}
           onDidDismiss={() => setShowAlert(false)}
           header={alertHeader}

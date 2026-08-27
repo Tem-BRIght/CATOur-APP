@@ -147,10 +147,16 @@ export const getUserProfile = async (userId: string): Promise<UserProfile | null
     const snap = await getDoc(userRef(userId));
     return snap.exists() ? (snap.data() as UserProfile) : null;
   } catch (err: any) {
-    console.error('[userProfileService] getUserProfile failed:', err);
-    if (err.code === 'permission-denied') {
-      throw new Error('Permission denied — check your Firestore security rules.');
+    const code = typeof err?.code === 'string' ? err.code.toLowerCase() : '';
+    const message = typeof err?.message === 'string' ? err.message.toLowerCase() : '';
+
+    if (code === 'permission-denied'
+      || message.includes('permission denied')
+      || message.includes('missing or insufficient permissions')
+      || message.includes('insufficient permissions')) {
+      return null;
     }
+    console.error('[userProfileService] getUserProfile failed:', err);
     throw err;
   }
 };

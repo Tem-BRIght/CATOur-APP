@@ -31,14 +31,15 @@
 
 /* ── Page ── */
 .fqr-content {
-  --background: #f0f6fd;
+  --background: var(--catour-page);
+  --padding-bottom: var(--catour-safe-bottom);
 }
 
 .fqr-wrapper {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 1.5rem 1.5rem 3rem 1.5rem;
+  padding: calc(1.5rem + var(--catour-safe-top)) var(--catour-space-page) calc(3rem + var(--catour-safe-bottom));
   gap: 1.2rem;
 }
 
@@ -84,8 +85,8 @@
 }
 
 .fqr-card-inner {
-  width: 260px;
-  height: 260px;
+  width: clamp(180px, 40vw, 320px);
+  height: clamp(180px, 40vw, 320px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -96,8 +97,8 @@
 }
 
 .fqr-image {
-  width: 260px;
-  height: 260px;
+  width: 100%;
+  height: 100%;
   border-radius: 0.5rem;
   animation: fqrFadeIn 0.4s ease;
 }
@@ -230,10 +231,4 @@
 /* ── Responsive ── */
 @media (max-width: 768px) {
   .fqr-title { font-size: 1.15rem; }
-
-  .fqr-card-inner,
-  .fqr-image {
-    width: 220px;
-    height: 220px;
-  }
 }

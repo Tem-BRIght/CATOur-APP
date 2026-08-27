@@ -3,12 +3,13 @@ import { useHistory } from 'react-router-dom';
 import { 
   IonContent, IonPage, IonToolbar, 
   IonButtons, IonBackButton, IonButton, IonInput, 
-  IonItem, IonLabel, IonAlert, IonCheckbox,
+  IonItem, IonLabel, IonCheckbox,
   InputCustomEvent, InputChangeEventDetail
 } from '@ionic/react';
 import { useSignup } from '../../context/SignupContext';
 import { useAuth } from '../../context/AuthContext';
 import './signup.css';
+import FeedbackOverlay from '../../components/FeedbackOverlay';
 
 const SignUP1: React.FC = () => {
   const history = useHistory();
@@ -123,7 +124,7 @@ const SignUP1: React.FC = () => {
           </div>
         </div>
 
-        <IonAlert
+        <FeedbackOverlay
           isOpen={showAlert}
           onDidDismiss={() => setShowAlert(false)}
           header="Required Fields"
