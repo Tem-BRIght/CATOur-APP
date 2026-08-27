@@ -21,7 +21,11 @@ jobs:
           cache: npm
 
       - name: Install dependencies
+<<<<<<< HEAD
         run: npm install --legacy-peer-deps
+=======
+        run: npm ci --legacy-peer-deps
+>>>>>>> 22feb88 (Merge remote main)
 
       - name: Build web app
         run: npm run build
@@ -54,4 +58,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: CaTour-ipa
+<<<<<<< HEAD
           path: build/ipa/CaTour.ipa
+=======
+          path: build/ipa/CaTour.ipa
+>>>>>>> 22feb88 (Merge remote main)

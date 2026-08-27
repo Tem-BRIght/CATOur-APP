@@ -13,6 +13,7 @@ import {
   IonButton,
   IonList,
   IonItem,
+  IonSearchbar,
 } from '@ionic/react';
 import { 
   arrowBackOutline,
@@ -25,6 +26,7 @@ import {
   mapOutline,
   cardOutline,
   walkOutline,
+  search,
 } from 'ionicons/icons';
 import './History.css';
 import { useAuth } from '../../context/AuthContext';
@@ -105,6 +107,7 @@ const History: React.FC = () => {
   const [selectedSession, setSelectedSession] = useState<any>(null);
   const [showModal, setShowModal]             = useState(false);
   const [sessions, setSessions]               = useState<any[]>([]);
+  const [searchQuery, setSearchQuery]         = useState('');
   const [loading, setLoading]                 = useState(false);
   const history = useHistory();
   const { currentUser } = useAuth();
@@ -139,9 +142,6 @@ const History: React.FC = () => {
         const docs = snap.docs
           .map(d => {
             const data: any = d.data();
-            const status = data.status ?? 'pending';
-            if (status !== 'ended' && status !== 'Cancelled') return null;
-
             const start = data.startTime ? new Date(data.startTime).getTime() : null;
             const end = data.endTime ? new Date(data.endTime).getTime() : null;
             const durationSeconds = typeof data.durationSeconds === 'number'
@@ -215,6 +215,21 @@ const History: React.FC = () => {
   };
 
   const totalTourists = sessions.reduce((acc: number, s: any) => acc + s.tourists.length, 0);
+  const filteredSessions = sessions.filter((session: any) => {
+    const term = searchQuery.trim().toLowerCase();
+    if (!term) return true;
+    const searchable = [
+      session.id,
+      session.tourTypeName,
+      session.destinationName,
+      session.guideName,
+      formatDate(session.date),
+      formatDateTime(session.startTime),
+      formatDateTime(session.endTime),
+      ...session.tourists.map((tourist: any) => tourist.name),
+    ].filter(Boolean).join(' ').toLowerCase();
+    return searchable.includes(term);
+  });
 
   return (
     <IonPage>
@@ -225,7 +240,7 @@ const History: React.FC = () => {
           <div onClick={() => history.goBack()} className="back-button">
             <IonIcon icon={arrowBackOutline} />
           </div>
-          <IonTitle className="history-title">Tour History</IonTitle>
+          <IonTitle className="history-title">History</IonTitle>
         </IonToolbar>
       </IonHeader>
 
@@ -244,9 +259,22 @@ const History: React.FC = () => {
         </div>
 
         <div className="history-list">
-          <h3>Recent Sessions</h3>
+          <h3>Tour Sessions</h3>
 
-          {sessions.map((session: any) => {
+          <IonSearchbar
+            className="session-search"
+            value={searchQuery}
+            placeholder="Search tour sessions..."
+            searchIcon={search}
+            debounce={0}
+            onIonInput={(event) => setSearchQuery(event.detail.value ?? '')}
+          />
+
+          {filteredSessions.length === 0 && (
+            <p className="no-sessions">{searchQuery ? 'No matching tour sessions.' : 'No tour sessions yet.'}</p>
+          )}
+
+          {filteredSessions.map((session: any) => {
             const hasPendingFeedback = session.tourists.some((tourist: any) => tourist.status !== 'Reviewed');
             return (
               <IonCard

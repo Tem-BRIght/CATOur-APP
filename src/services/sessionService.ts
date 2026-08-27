@@ -459,7 +459,7 @@ export async function updateSessionStatus(
 
     await Promise.all(updated.tourists.map(tourist => createNotification({
       userId: tourist.uid,
-      type: 'location',
+      type: 'reserved',
       title,
       message,
     })));
@@ -631,9 +631,20 @@ export async function unmarkStopVisited(sessionId: string, stopId: string): Prom
  */
 export async function getSession(sessionId: string): Promise<TourSession | null> {
   try {
-    const snap = await getDoc(sessionDoc(sessionId));
-    if (!snap.exists()) return null;
-    const session = { id: snap.id, ...snap.data() } as TourSession;
+    let snap = await getDoc(sessionDoc(sessionId));
+    let sessionData: Record<string, unknown> | null = snap.exists()
+      ? snap.data() as Record<string, unknown>
+      : null;
+
+    // Older/generated tour records may survive only in the mirrored bookings
+    // collection. Keep the tourist review flow usable for those sessions.
+    if (!sessionData) {
+      const bookingSnap = await getDoc(doc(firestore, 'bookings', sessionId));
+      if (bookingSnap.exists()) sessionData = bookingSnap.data() as Record<string, unknown>;
+    }
+
+    if (!sessionData) return null;
+    const session = { id: sessionId, ...sessionData } as TourSession;
     if (Array.isArray(session.tourists)) {
       const enrichedTourists = await Promise.all(session.tourists.map(async (tourist) => {
         const profile = tourist.uid ? await getUserProfile(tourist.uid) : null;
@@ -742,12 +753,18 @@ export function buildJoinedSessionFallbacks(
 export async function getUserJoinedSessions(uid: string): Promise<TourSession[]> {
   try {
     const [sessionsSnap, guidesSnap] = await Promise.all([
-      getDocs(query(sessionsCol(), where('touristUids', 'array-contains', uid))),
+      // Read the full session list so older sessions that predate the
+      // `touristUids` mirror are still resolved to their real TOUR-* ID.
+      getDocs(sessionsCol()),
       getDocs(collection(firestore, 'tourGuides')),
     ]);
 
     const sessions = sessionsSnap.docs
-      .map((d) => ({ id: d.id, ...d.data() } as TourSession));
+      .map((d) => ({ id: d.id, ...d.data() } as TourSession))
+      .filter((session) => (
+        (Array.isArray(session.touristUids) && session.touristUids.includes(uid)) ||
+        (Array.isArray(session.tourists) && session.tourists.some((tourist) => tourist.uid === uid))
+      ));
 
     sessions.forEach((session) => {
       const guideData = guidesSnap.docs.find((guideDoc) => guideDoc.id === session.guideId)?.data() as any;

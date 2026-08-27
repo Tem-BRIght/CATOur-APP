@@ -491,7 +491,7 @@ export async function joinTour(
     });
     await createNotification({
       userId,
-      type: 'location',
+      type: 'reserved',
       title: 'Tour Joined',
       message: `You have joined the tour "${session.destinationName}" with guide ${bookedSlot.guideName}.`,
     });

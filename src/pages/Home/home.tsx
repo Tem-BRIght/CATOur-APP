@@ -116,28 +116,24 @@ const Home: React.FC = () => {
   useEffect(() => {
     if (authLoading || !isAuthenticated) return;
 
-    let unsubscribe: (() => void) | null = null;
-    const timer = window.setTimeout(() => {
-      unsubscribe = onSnapshot(
-        query(collection(firestore, 'visits'), orderBy('createdAt', 'desc'), limit(500)),
-        (snap) => {
-          const countMap = new Map<string, number>();
-          snap.forEach(d => {
-            const name: string = (d.data() as any).destinationTop ?? '';
-            if (name) countMap.set(name, (countMap.get(name) ?? 0) + 1);
-          });
-          const ranked = Array.from(countMap.entries()).sort((a, b) => b[1] - a[1]);
-          const rankMap = new Map<string, number>();
-          ranked.forEach(([name], i) => rankMap.set(name, i + 1));
-          setVisitRanks(rankMap);
-        },
-        (err) => console.error('[Home] visits onSnapshot error:', err),
-      );
-    }, 1200);
+    const unsubscribe = onSnapshot(
+      query(collection(firestore, 'visits'), orderBy('createdAt', 'desc'), limit(500)),
+      (snap) => {
+        const countMap = new Map<string, number>();
+        snap.forEach(d => {
+          const name: string = (d.data() as any).destinationTop ?? '';
+          if (name) countMap.set(name, (countMap.get(name) ?? 0) + 1);
+        });
+        const ranked = Array.from(countMap.entries()).sort((a, b) => b[1] - a[1]);
+        const rankMap = new Map<string, number>();
+        ranked.forEach(([name], i) => rankMap.set(name, i + 1));
+        setVisitRanks(rankMap);
+      },
+      (err) => console.error('[Home] visits onSnapshot error:', err),
+    );
 
     return () => {
-      window.clearTimeout(timer);
-      unsubscribe?.();
+      unsubscribe();
     };
   }, [authLoading, isAuthenticated]);
 

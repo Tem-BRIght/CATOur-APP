@@ -10,9 +10,9 @@ import {
   IonList,
   IonItem,
   IonLabel,
-  IonIcon,
-  IonButton
+  IonIcon
 } from '@ionic/react';
+import { Share } from '@capacitor/share';
 import {
   informationCircleOutline,
   sparklesOutline,
@@ -25,7 +25,33 @@ import {
 
 import './About.css';
 
+const WEBSITE_URL = 'https://catour.app';
+const PLAY_STORE_URL = 'https://play.google.com/store/apps/details?id=io.catour.app';
+
 const About: React.FC = () => {
+  const openExternalLink = (url: string) => {
+    window.open(url, '_blank', 'noopener,noreferrer');
+  };
+
+  const handleShare = async () => {
+    try {
+      await Share.share({
+        title: 'CATOur',
+        text: 'Discover Pasig with CATOur.',
+        url: WEBSITE_URL,
+        dialogTitle: 'Share CATOur',
+      });
+    } catch (error) {
+      if (error instanceof Error && error.message.toLowerCase().includes('cancel')) return;
+      console.error('[About] Share failed:', error);
+      try {
+        await navigator.clipboard.writeText(WEBSITE_URL);
+      } catch (clipboardError) {
+        console.error('[About] Copy share link failed:', clipboardError);
+      }
+    }
+  };
+
   return (
     <IonPage>
       <IonHeader>
@@ -92,12 +118,12 @@ const About: React.FC = () => {
             <IonLabel><strong>Contact</strong></IonLabel>
           </IonItem>
 
-          <IonItem>
+          <IonItem button onClick={() => window.open('mailto:support@pasigtourism.app')}>
             <IonIcon icon={mailOutline} slot="start" />
             <IonLabel>support@pasigtourism.app</IonLabel>
           </IonItem>
 
-          <IonItem>
+          <IonItem button onClick={() => window.open('tel:6436431111')}>
             <IonIcon icon={callOutline} slot="start" />
             <IonLabel>643-1111 loc 1156</IonLabel>
           </IonItem>
@@ -110,15 +136,15 @@ const About: React.FC = () => {
             <IonLabel><strong>Links</strong></IonLabel>
           </IonItem>
 
-          <IonItem button>
+          <IonItem button onClick={() => openExternalLink(WEBSITE_URL)}>
             <IonLabel>Visit Website</IonLabel>
           </IonItem>
 
-          <IonItem button>
+          <IonItem button onClick={() => openExternalLink(PLAY_STORE_URL)}>
             <IonLabel>Rate on App Store</IonLabel>
           </IonItem>
 
-          <IonItem button>
+          <IonItem button onClick={() => void handleShare()}>
             <IonIcon icon={shareSocialOutline} slot="start" />
             <IonLabel>Share with Friends</IonLabel>
           </IonItem>

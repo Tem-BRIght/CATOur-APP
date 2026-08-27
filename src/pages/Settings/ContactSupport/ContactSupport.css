@@ -130,3 +130,40 @@ ion-item ion-icon {
 
 .social-btn--fb   { background: #e7f0fd; color: #1877f2; }
 .social-btn--ig   { background: #fce4ec; color: #e1306c; }
+
+.support-conversation-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.support-conversation-hint {
+  margin: 10px 2px 0;
+  font-size: 12px;
+  color: #6b7280;
+  font-style: italic;
+}
+
+/* ── Ongoing conversation card (links into SupportChat.tsx) ──────────────── */
+.ongoing-conversation-item {
+  --padding-top: 10px;
+  --padding-bottom: 10px;
+}
+
+.ongoing-conversation-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.ongoing-conversation-preview {
+  margin: 3px 0 0;
+  font-size: 12.5px;
+  color: #6b7280;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 240px;
+}

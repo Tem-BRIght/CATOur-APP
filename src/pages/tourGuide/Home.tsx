@@ -180,7 +180,7 @@ const Home: React.FC = () => {
                     <IonIcon icon={timeOutline} />
                   </div>
                   <h4>History</h4>
-                  <p>Past activities</p>
+                  <p>Past activities and upcoming tour session</p>
                 </div>
               </IonCol>
             </IonRow>

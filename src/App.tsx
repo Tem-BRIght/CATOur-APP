@@ -52,9 +52,11 @@ import Permissions       from './pages/Settings/Permissions';
 import Help              from './pages/Settings/Help';
 import ReportProblem     from './pages/Settings/ReportProblem/ReportProblem';
 import ContactSupport    from './pages/Settings/ContactSupport/ContactSupport';
+import SupportChat       from './pages/Settings/ContactSupport/SupportChat';
 import Terms             from './pages/Settings/Terms/Terms';
 import VerifyEmail        from './pages/Settings/VerifyEmail/VerifyEmail';
 import VerifyPhone        from './pages/Settings/VerifyPhone/VerifyPhone';
+import ChangePassword     from './pages/Settings/ChangePassword/ChangePassword';
 
 // ── Other ─────────────────────────────────────────────────────────────────────
 import AIGuide           from './pages/AI/AIGuide';
@@ -187,11 +189,13 @@ const App: React.FC = () => {
             <ProtectedRoute exact path="/scan"           component={Scan}              allowedRole="user" />
             <ProtectedRoute exact path="/settings/verify-email" component={VerifyEmail} allowedRole="user" />
             <ProtectedRoute exact path="/settings/verify-phone" component={VerifyPhone} allowedRole="user" />
+            <ProtectedRoute exact path="/settings/change-password" component={ChangePassword} allowedRole="user" />
             <ProtectedRoute exact path="/settings/about" component={About}             allowedRole="user" />
             <ProtectedRoute exact path="/settings/permissions" component={Permissions} allowedRole="user" />
             <ProtectedRoute exact path="/settings/help"  component={Help}              allowedRole="user" />
             <ProtectedRoute exact path="/settings/report-problem" component={ReportProblem} allowedRole="user" />
             <ProtectedRoute exact path="/settings/contact-support" component={ContactSupport} allowedRole="user" />
+            <ProtectedRoute exact path="/support-chat/:ticketId" component={SupportChat} allowedRole="user" />
             <ProtectedRoute exact path="/settings/terms"          component={Terms}             allowedRole="user" />
 
             {/* ── Destination detail ────────────────────────────────────────── */}
@@ -209,7 +213,7 @@ const App: React.FC = () => {
 
             {/* ── Tour Session (tourist view) ────────────────────────────────── */}
             <ProtectedRoute exact path="/tour-session/:sessionId"   component={TourSession}      allowedRole="user" />
-            <Route exact path="/feedback/:sessionId"     component={Tourguidefeedback} />
+            <ProtectedRoute exact path="/feedback/:sessionId" component={Tourguidefeedback} allowedRole="user" />
             <Route exact path="/reviews/:sessionId?/:guideId?" component={Reviews} />
 
             {/* ── Default: show loading first ────────────────────────────────── */}

@@ -55,7 +55,7 @@ const CATEGORIES: { key: CategoryKey; label: string }[] = [
 const TourGuideFeedback: React.FC = () => {
   const { sessionId } = useParams<RouteParams>();
   const history = useHistory();
-  const { currentUser } = useAuth();
+  const { currentUser, authLoading } = useAuth();
 
   const [loading, setLoading] = useState(true);
   const [session, setSession] = useState<TourSession | null>(null);
@@ -80,6 +80,11 @@ const TourGuideFeedback: React.FC = () => {
 
   // ── Load session + check prior submission ──────────────────────────────
   useEffect(() => {
+    if (authLoading) {
+      setLoading(true);
+      return;
+    }
+
     if (!sessionId) {
       setLoading(false);
       return;
@@ -117,7 +122,7 @@ const TourGuideFeedback: React.FC = () => {
     };
 
     load();
-  }, [sessionId, currentUser]);
+  }, [sessionId, currentUser, authLoading]);
 
   const handleCategoryRate = (key: CategoryKey, value: number) => {
     setCategoryRatings(prev => ({ ...prev, [key]: value }));

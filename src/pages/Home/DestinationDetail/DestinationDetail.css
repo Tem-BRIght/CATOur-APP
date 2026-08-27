@@ -727,6 +727,7 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
+  cursor: zoom-in;
 }
 
 .dd-been-here-avatar--anon {
@@ -814,6 +815,7 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
+  cursor: zoom-in;
 }
 
 /* Anonymous reviewer — grey circle with "A" */
@@ -943,6 +945,7 @@
   height: 100%;
   object-fit: cover;
   border-radius: 50%;
+  cursor: zoom-in;
 }
 
 .dd-reply-body {
@@ -1038,6 +1041,7 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
+  cursor: zoom-in;
 }
 
 .dd-reply-compose-right {

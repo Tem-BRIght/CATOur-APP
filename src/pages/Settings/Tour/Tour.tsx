@@ -19,8 +19,10 @@ import {
   IonSegment,
   IonSegmentButton,
   IonLabel,
+  IonModal,
 } from '@ionic/react';
 import { useIonRouter } from '@ionic/react';
+import { collection, documentId, getDocs, query, where } from 'firebase/firestore';
 import {
   calendarOutline,
   timeOutline,
@@ -43,6 +45,8 @@ import {
 } from '../../../services/tourScheduleService';
 import { cancelJoinedSession, getUserJoinedSessions } from '../../../services/sessionService';
 import type { TourSession } from '../../../services/sessionService';
+import { getFeedback } from '../../../services/feedbackService';
+import { firestore } from '../../../firebase';
 import './Tour.css';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────
@@ -167,6 +171,17 @@ const TourPage: React.FC = () => {
   // "Check Availability".
   const [upcomingGroups, setUpcomingGroups] = useState<UpcomingSlotGroup[]>([]);
   const [upcomingLoading, setUpcomingLoading] = useState(false);
+  const [feedbackViewer, setFeedbackViewer] = useState<{
+    session: TourSession;
+    feedback: {
+      rating?: number;
+      categoryRatings?: Record<string, number>;
+      comment?: string;
+    } | null;
+    places: string[];
+  } | null>(null);
+  const [feedbackLoading, setFeedbackLoading] = useState(false);
+  const [fullScreenImage, setFullScreenImage] = useState<{ src: string; alt: string } | null>(null);
 
   // ── Tour history — every session this tourist is on, joined either via
   // "Check Availability" below or by scanning a guide's QR. Previously this
@@ -291,6 +306,43 @@ const TourPage: React.FC = () => {
       setToastMsg('Joined tour cancelled.');
     } catch (err: any) {
       setToastMsg(err.message || 'Could not cancel this tour.');
+    }
+  };
+
+  const handleViewFeedback = async (session: TourSession) => {
+    if (!user?.uid) return;
+    setFeedbackLoading(true);
+    try {
+      const feedback = await getFeedback(session.id, user.uid);
+      let places = session.itinerary || [];
+
+      if (places.length === 0 && session.tourTypeId) {
+        const typeSnap = await getDocs(query(
+          collection(firestore, 'tourTypes'),
+          where(documentId(), '==', session.tourTypeId),
+        ));
+        const destinationIds = (typeSnap.docs[0]?.data().destinations || []) as string[];
+        if (destinationIds.length > 0) {
+          const destinationSnap = await getDocs(query(
+            collection(firestore, 'destinations'),
+            where(documentId(), 'in', destinationIds.slice(0, 30)),
+          ));
+          const names = new Map(destinationSnap.docs.map((doc) => [
+            doc.id,
+            String(doc.data().title || doc.data().name || ''),
+          ]));
+          places = destinationIds.map((id) => names.get(id) || '').filter(Boolean);
+        }
+      }
+
+      if (places.length === 0 && session.destinationName) places = [session.destinationName];
+      setFeedbackViewer({ session, feedback, places });
+      if (!feedback) setToastMsg('You have not submitted feedback for this tour yet.');
+    } catch (err) {
+      console.error('Failed to load your feedback:', err);
+      setToastMsg('Could not load your feedback.');
+    } finally {
+      setFeedbackLoading(false);
     }
   };
 
@@ -519,7 +571,16 @@ const TourPage: React.FC = () => {
                         <div className="ht-meta-row">
                           <span className="ht-guide-chip">
                             <span className="ht-guide-avatar">
-                              {s.guidePhotoUrl ? <img src={s.guidePhotoUrl} alt="" /> : <IonIcon icon={personOutline} />}
+                              {s.guidePhotoUrl ? (
+                                <img
+                                  src={s.guidePhotoUrl}
+                                  alt={s.guideName}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setFullScreenImage({ src: s.guidePhotoUrl!, alt: s.guideName });
+                                  }}
+                                />
+                              ) : <IonIcon icon={personOutline} />}
                             </span>
                             <span className="ht-guide-name">{s.guideName}</span>
                           </span>
@@ -557,12 +618,13 @@ const TourPage: React.FC = () => {
                               fill="clear"
                               size="small"
                               className="ht-action-btn"
+                              disabled={feedbackLoading}
                               onClick={(e) => {
                                 e.stopPropagation();
-                                router.push(`/feedback/${s.id}`, 'forward');
+                                void handleViewFeedback(s);
                               }}
                             >
-                              Feedback
+                              View Feedback
                             </IonButton>
                           )}
                           {isPending && (
@@ -653,7 +715,16 @@ const TourPage: React.FC = () => {
                         <span className="slot-row-time">{formatTime(slot.startTime)} - {formatTime(slot.endTime)}</span>
                         <span className="slot-row-guide">
                           <span className="slot-row-guide-avatar">
-                            {slot.guidePhotoUrl ? <img src={slot.guidePhotoUrl} alt="" /> : <IonIcon icon={personOutline} />}
+                            {slot.guidePhotoUrl ? (
+                              <img
+                                src={slot.guidePhotoUrl}
+                                alt={slot.guideName}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setFullScreenImage({ src: slot.guidePhotoUrl!, alt: slot.guideName });
+                                }}
+                              />
+                            ) : <IonIcon icon={personOutline} />}
                           </span>
                           {slot.guideName}
                         </span>
@@ -737,7 +808,16 @@ const TourPage: React.FC = () => {
                                 <span className="slot-row-time">{formatTime(slot.startTime)} - {formatTime(slot.endTime)}</span>
                                 <span className="slot-row-guide">
                                   <span className="slot-row-guide-avatar">
-                                    {slot.guidePhotoUrl ? <img src={slot.guidePhotoUrl} alt="" /> : <IonIcon icon={personOutline} />}
+                                    {slot.guidePhotoUrl ? (
+                                      <img
+                                        src={slot.guidePhotoUrl}
+                                        alt={slot.guideName}
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setFullScreenImage({ src: slot.guidePhotoUrl!, alt: slot.guideName });
+                                        }}
+                                      />
+                                    ) : <IonIcon icon={personOutline} />}
                                   </span>
                                   {slot.guideName}
                                 </span>
@@ -775,6 +855,113 @@ const TourPage: React.FC = () => {
             </div>
           </div>
         )}
+
+        <IonModal
+          className="feedback-viewer-modal"
+          isOpen={!!feedbackViewer?.feedback}
+          onDidDismiss={() => setFeedbackViewer(null)}
+        >
+          <IonHeader className="feedback-viewer-header">
+            <IonToolbar className="feedback-viewer-toolbar">
+              <IonTitle className="feedback-viewer-title">Your Feedback</IonTitle>
+              <IonButtons slot="end">
+                <IonButton className="feedback-viewer-close" onClick={() => setFeedbackViewer(null)}>Close</IonButton>
+              </IonButtons>
+            </IonToolbar>
+          </IonHeader>
+          <IonContent className="feedback-viewer-content">
+            {feedbackViewer?.feedback && (
+              <div className="feedback-viewer-body">
+                <div className="feedback-viewer-guide">
+                  <div className="feedback-viewer-avatar">
+                    {feedbackViewer.session.guidePhotoUrl ? (
+                      <img
+                        src={feedbackViewer.session.guidePhotoUrl}
+                        alt={feedbackViewer.session.guideName}
+                        onClick={() => setFullScreenImage({
+                          src: feedbackViewer.session.guidePhotoUrl!,
+                          alt: feedbackViewer.session.guideName,
+                        })}
+                      />
+                    ) : (
+                      <IonIcon icon={personOutline} />
+                    )}
+                  </div>
+                  <div>
+                    <h2>{feedbackViewer.session.guideName}</h2>
+                  </div>
+                </div>
+
+                <section className="feedback-viewer-score">
+                  <div>
+                    <span className="feedback-viewer-label">Overall experience</span>
+                    <strong>{feedbackViewer.feedback.rating || 0}<small>/5</small></strong>
+                  </div>
+                  <div className="feedback-viewer-stars" aria-label={`${feedbackViewer.feedback.rating || 0} out of 5 stars`}>
+                    {[1, 2, 3, 4, 5].map((starNumber) => (
+                      <span key={starNumber} className={starNumber <= (feedbackViewer.feedback?.rating || 0) ? 'is-filled' : ''}>★</span>
+                    ))}
+                  </div>
+                </section>
+
+                <section className="feedback-viewer-section">
+                  <h3>Places visited</h3>
+                  <div className="feedback-viewer-places">
+                    
+                    <p>{feedbackViewer.session.tourTypeName || 'Tour'}</p>
+                    {feedbackViewer.places.map((place) => (
+                      <span key={place}>
+                        <IonIcon icon={locationOutline} />
+                        {place}
+                      </span>
+                    ))}
+                  </div>
+                </section>
+
+                <section className="feedback-viewer-section">
+                  <h3>Category ratings</h3>
+                  <div className="feedback-viewer-categories">
+                    {[
+                      ['Knowledge', 'knowledge'],
+                      ['Friendliness', 'friendliness'],
+                      ['Punctuality', 'punctuality'],
+                      ['Communication', 'communication'],
+                    ].map(([label, key]) => (
+                      <div className="feedback-viewer-category" key={key}>
+                        <span>{label}</span>
+                        <strong>{feedbackViewer.feedback?.categoryRatings?.[key] || '—'}<small>/5</small></strong>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+
+                <section className="feedback-viewer-section feedback-viewer-comment">
+                  <h3>Your comment</h3>
+                  <p>{feedbackViewer.feedback.comment || 'No comment provided.'}</p>
+                </section>
+              </div>
+            )}
+          </IonContent>
+        </IonModal>
+
+        <IonModal
+          className="full-screen-image-modal"
+          isOpen={!!fullScreenImage}
+          onDidDismiss={() => setFullScreenImage(null)}
+        >
+          <IonContent className="full-screen-image-content">
+            <button
+              className="full-screen-image-close"
+              onClick={() => setFullScreenImage(null)}
+              aria-label="Close photo"
+            >
+              <IonIcon icon={closeOutline} />
+            </button>
+            {fullScreenImage && (
+              <img src={fullScreenImage.src} alt={fullScreenImage.alt} />
+            )}
+          </IonContent>
+        </IonModal>
 
         <IonToast
           isOpen={!!toastMsg}

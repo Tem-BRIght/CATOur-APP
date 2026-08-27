@@ -78,8 +78,6 @@ const Profile: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const unsubRef    = useRef<Unsubscribe | null>(null);
 
-  // Address edit state for edit mode
-  const [editAddress, setEditAddress] = useState('');
   const [otherNationality, setOtherNationality] = useState('');
   const [otherReligion, setOtherReligion] = useState('');
 
@@ -118,7 +116,6 @@ const Profile: React.FC = () => {
           const originalString = typeof profile.address === 'string' && profile.address.trim()
             ? profile.address.trim()
             : '';
-          setEditAddress(prev => prev || (originalString || joinedAddressFromParts));
         } else {
           setUserProfile(null);
         }
@@ -203,7 +200,6 @@ const Profile: React.FC = () => {
       const religionValue = getSelectValue(savedReligion, RELIGIONS);
       setOtherNationality(nationalityValue === 'Other' ? savedNationality : '');
       setOtherReligion(religionValue === 'Other' ? savedReligion : '');
-      setEditAddress(initialEdit);
       setEditForm({
         ...userProfile,
         address: initialEdit,
@@ -219,9 +215,6 @@ const Profile: React.FC = () => {
     setEditForm({});
     setOtherNationality('');
     setOtherReligion('');
-    const addr = normalizeAddressValue(userProfile?.address as UserAddress | string | undefined);
-    const joinedAddress = [addr.brgy, addr.city, addr.region].filter(Boolean).join(', ');
-    setEditAddress(joinedAddress);
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
@@ -244,7 +237,7 @@ const Profile: React.FC = () => {
         }
       }
 
-      const nextAddress = editAddress.trim();
+      const nextAddress = (editForm.address as string | undefined)?.trim() ?? '';
       const nextNationality = editForm.nationality === 'other'
         ? otherNationality.trim()
         : editForm.nationality?.trim() ?? userProfile.nationality ?? '';
@@ -253,8 +246,6 @@ const Profile: React.FC = () => {
         : editForm.religion ?? userProfile.religion ?? '';
       if (!nextNationality) throw new Error('Nationality is required');
       if (!nextReligion) throw new Error('Religion is required');
-      setEditForm(prev => ({ ...prev, address: nextAddress }));
-
       const toSave: Partial<UserProfile> = {
         email: userProfile.email || user?.email || '',
         dateOfBirth: editForm.dateOfBirth ?? userProfile.dateOfBirth ?? '',
@@ -553,9 +544,9 @@ const Profile: React.FC = () => {
                     <IonItem>
                       <IonLabel position="stacked">Address</IonLabel>
                       <IonInput
-                        value={editAddress}
+                        value={editForm.address as string || ''}
                         placeholder="Enter your full address"
-                        onIonChange={e => setEditAddress(e.detail.value ?? '')}
+                        onIonChange={e => handleInputChange('address', e.detail.value ?? '')}
                       />
                     </IonItem>
                   </IonList>

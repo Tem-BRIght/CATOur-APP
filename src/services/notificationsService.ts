@@ -93,6 +93,7 @@ export type NotifType =
   | 'visit'
   | 'reply'
   | 'destination'
+  | 'reserved'
   | 'new_message';
 
 export interface AppNotification {

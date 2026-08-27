@@ -261,14 +261,14 @@ service cloud.firestore {
       allow update: if (isAdmin() &&
         request.resource.data.diff(resource.data).affectedKeys().hasOnly([
           'assignedAdminId', 'assignedAdminName', 'lastMessage', 'lastMessageAt',
-          'unreadByAdmin', 'unreadByUser', 'status'
+          'lastMessageBySenderRole', 'unreadByAdmin', 'unreadByUser', 'status'
         ]) &&
         (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['assignedAdminId', 'assignedAdminName']) ||
          (resource.data.assignedAdminId == null && request.resource.data.assignedAdminId == request.auth.uid) ||
          (resource.data.assignedAdminId == request.auth.uid && request.resource.data.assignedAdminId == resource.data.assignedAdminId))) ||
         (isOwner(resource.data.userId) &&
          request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-           'lastMessage', 'lastMessageAt', 'unreadByUser', 'status'
+           'lastMessage', 'lastMessageAt', 'lastMessageBySenderRole', 'unreadByUser', 'status'
          ]));
       allow delete: if isSuperAdmin() || isOwner(resource.data.userId);
 

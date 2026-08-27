@@ -135,7 +135,10 @@ const GenerateQR: React.FC = () => {
         });
 
         const now = Date.now();
-        const activeSlots = sortedSlots.filter((slot) => isSlotWithinQrWindow(slot, now));
+        const today = new Date().toLocaleDateString('en-CA');
+        const activeSlots = sortedSlots.filter((slot) =>
+          slot.date === today && isSlotWithinQrWindow(slot, now)
+        );
 
         if (activeSlots.length > 0) {
           const firstActive = {
@@ -216,7 +219,7 @@ const GenerateQR: React.FC = () => {
     <IonContent className="generate-content"><div className="generate-wrapper">
       <div className="gen-instruction"><p>Select a tour type, then share the QR code with your tourists.</p></div>
       {!hasSlotToday ? <div className="qr-card"><div className="qr-expired-overlay"><IonIcon icon={calendarClearOutline} />
-        <p>{allSlotsExpiredToday ? 'Tour ended' : 'No active tour'}</p><span>{allSlotsExpiredToday ? 'This tour slot has already ended.' : 'QR is available until the tour ends.'}</span>
+        <p>{allSlotsExpiredToday ? 'No tours available today' : 'No active tour'}</p><span>{allSlotsExpiredToday ? 'This tour slot has already end.' : 'QR is available until the tour ends.'}</span>
       </div></div> : <>
         <div style={{ margin: '12px 0 8px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
           {slotsToday.map((slot) => {

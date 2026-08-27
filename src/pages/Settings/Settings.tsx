@@ -24,6 +24,7 @@ import {
   warningOutline,
   phonePortraitOutline,
   documentTextOutline,
+  lockClosedOutline,
   logOutOutline,
   chevronForwardOutline,
   personCircleOutline,
@@ -114,6 +115,7 @@ const Settings: React.FC = () => {
       case 'Report Problem':   router.push('/settings/report-problem');     break;
       case 'About App':        router.push('/settings/about');              break;
       case 'Terms & Privacy':  router.push('/settings/terms');              break;
+      case 'Change Password': router.push('/settings/change-password');     break;
       default:                 console.log('[Settings] unhandled:', label);
     }
   };
@@ -281,11 +283,19 @@ const Settings: React.FC = () => {
           </div>
         </div>
 
+        {/* ── Privacy & Security ───────────────────────────────────────────── */}
+        <div className="section">
+          <p className="section-title">Privacy & Security</p>
+          <div className="card">
+            <Item icon={shieldCheckmarkOutline} color="cyan" label="Privacy Settings" onClick={() => onItemClick('Privacy Settings')} />
+            <Item icon={lockClosedOutline} color="blue" label="Change Password" onClick={() => onItemClick('Change Password')} />
+          </div>
+        </div>
+
         {/* ── Support ────────────────────────────────────────────────────── */}
         <div className="section">
           <p className="section-title">Support</p>
           <div className="card">
-            <Item icon={shieldCheckmarkOutline} color="cyan" label="Privacy Settings" onClick={() => onItemClick('Privacy Settings')} />
             <Item icon={helpCircleOutline} color="cyan" label="Help Center"     onClick={() => onItemClick('Help Center')}     />
             <Item icon={headsetOutline}    color="mint" label="Contact Support" onClick={() => onItemClick('Contact Support')} />
             <Item icon={warningOutline}    color="red"  label="Report Problem"  onClick={() => onItemClick('Report Problem')}  />

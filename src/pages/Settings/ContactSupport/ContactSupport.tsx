@@ -27,7 +27,11 @@ import {
   sendOutline,
   checkmarkCircleOutline,
 } from 'ionicons/icons';
-import { collection, doc, onSnapshot, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore';
+import {
+  collection, doc, onSnapshot, serverTimestamp, setDoc, updateDoc,
+  query, where, getDocs,
+} from 'firebase/firestore';
+import { useHistory } from 'react-router-dom';
 import { useAuth } from '../../../context/AuthContext';
 import { firestore } from '../../../firebase';
 
@@ -38,20 +42,51 @@ const ContactSupport: React.FC = () => {
   const [showToast, setShowToast] = useState(false);
   const [toastMsg, setToastMsg] = useState('');
   const [ticketId, setTicketId] = useState<string | null>(null);
-  const [ticketMessages, setTicketMessages] = useState<any[]>([]);
+  const [ticketStatus, setTicketStatus] = useState<string | null>(null);
+  const [sending, setSending] = useState(false);
   const { user } = useAuth();
+  const history = useHistory();
 
   const now = new Date();
   const hour = now.getHours();
   const isOpen = hour >= 9 && hour < 17; // 9 AM – 5 PM
 
+  // Keep the latest ticket id so a resolved conversation can be reopened.
+  useEffect(() => {
+    if (!user?.uid) return;
+
+    (async () => {
+      try {
+        const q = query(
+          collection(firestore, 'supportTickets'),
+          where('userId', '==', user.uid),
+        );
+        const snap = await getDocs(q);
+        if (!snap.empty) {
+          const latest = [...snap.docs].sort((a, b) => {
+            const aTime = a.data().lastMessageAt?.toMillis?.() ?? 0;
+            const bTime = b.data().lastMessageAt?.toMillis?.() ?? 0;
+            return bTime - aTime;
+          })[0];
+          setTicketId(latest.id);
+        }
+      } catch (err) {
+        console.error('[ContactSupport] failed to look up existing ticket', err);
+      }
+    })();
+  }, [user?.uid]);
+
   useEffect(() => {
     if (!ticketId) return;
     const ticketRef = doc(firestore, 'supportTickets', ticketId);
-    const messagesRef = collection(ticketRef, 'messages');
-    return onSnapshot(messagesRef, snapshot => {
-      setTicketMessages(snapshot.docs.map(item => ({ id: item.id, ...item.data() })));
-      void updateDoc(ticketRef, { unreadByUser: false });
+    return onSnapshot(ticketRef, snap => {
+      if (!snap.exists()) {
+        setTicketId(null);
+        setTicketStatus(null);
+        return;
+      }
+      const data = snap.data();
+      setTicketStatus(data.status ?? null);
     });
   }, [ticketId]);
 
@@ -64,13 +99,25 @@ const ContactSupport: React.FC = () => {
 
     try {
       if (!user?.uid) throw new Error('You must be signed in to contact support.');
+      setSending(true);
 
       const text = message.trim();
+      const reopening = ticketId && ticketStatus === 'resolved';
       const ticketRef = ticketId
         ? doc(firestore, 'supportTickets', ticketId)
         : doc(collection(firestore, 'supportTickets'));
       const messageRef = doc(collection(ticketRef, 'messages'));
-      if (!ticketId) {
+
+      if (reopening) {
+        await updateDoc(ticketRef, {
+          lastMessage: text,
+          lastMessageAt: serverTimestamp(),
+          lastMessageBySenderRole: 'user',
+          status: 'open',
+          unreadByAdmin: true,
+          unreadByUser: false,
+        });
+      } else {
         await setDoc(ticketRef, {
           uid: user.uid,
           userId: user.uid,
@@ -80,6 +127,7 @@ const ContactSupport: React.FC = () => {
           message: text,
           lastMessage: text,
           lastMessageAt: serverTimestamp(),
+          lastMessageBySenderRole: 'user',
           assignedAdminId: null,
           status: 'open',
           unreadByAdmin: true,
@@ -94,20 +142,15 @@ const ContactSupport: React.FC = () => {
         createdAt: serverTimestamp(),
         readAt: null,
       });
-      await updateDoc(ticketRef, {
-        lastMessage: text,
-        lastMessageAt: serverTimestamp(),
-        unreadByAdmin: true,
-        unreadByUser: false,
-      });
-      setTicketId(ticketRef.id);
-      setToastMsg("Message sent! We'll get back to you shortly.");
-      setShowToast(true);
+
       setMessage('');
+      history.push(`/support-chat/${ticketRef.id}`);
     } catch (err) {
       console.error('[ContactSupport] failed to send message', err);
       setToastMsg('Unable to send your message right now. Please try again later.');
       setShowToast(true);
+    } finally {
+      setSending(false);
     }
   };
 
@@ -233,40 +276,44 @@ const ContactSupport: React.FC = () => {
           </IonItem>
         </IonList>
 
-        {/* Send a message */}
+        {/* Send a message or return to the active conversation */}
         <IonList inset>
           <IonItem lines="none">
             <IonIcon icon={sendOutline} slot="start" />
-            <IonLabel><strong>Send a Message</strong></IonLabel>
+            <IonLabel><strong>{ticketId ? 'Back to Virtual Conversation' : 'Send a Message'}</strong></IonLabel>
           </IonItem>
         </IonList>
 
-        <div className="contact-message-area">
-          <IonTextarea
-            placeholder="Describe your question or concern…"
-            rows={5}
-            value={message}
-            onIonInput={e => setMessage(e.detail.value ?? '')}
-          />
-          <IonButton
-            expand="block"
-            className="contact-send-btn"
-            onClick={handleSendMessage}
-          >
-            <IonIcon icon={checkmarkCircleOutline} slot="start" />
-            Send Message
-          </IonButton>
-        </div>
-
-        {ticketId && (
-          <div className="support-conversation" aria-live="polite">
-            <h3>Your support conversation</h3>
-            {ticketMessages.map(item => (
-              <div key={item.id} className={`support-message${item.senderRole === 'admin' ? ' support-message--admin' : ''}`}>
-                <strong>{item.senderRole === 'admin' ? 'Support' : 'You'}</strong>
-                <p>{item.text}</p>
-              </div>
-            ))}
+        {ticketId && ticketStatus !== 'resolved' ? (
+          <div className="contact-message-area">
+            <IonButton
+              expand="block"
+              type="button"
+              className="contact-send-btn"
+              onClick={() => history.push(`/support-chat/${ticketId}`)}
+            >
+              <IonIcon icon={chatbubbleEllipsesOutline} slot="start" />
+              Back to Virtual Conversation
+            </IonButton>
+          </div>
+        ) : (
+          <div className="contact-message-area">
+            <IonTextarea
+              placeholder="Describe your question or concern…"
+              rows={5}
+              value={message}
+              onIonInput={e => setMessage(e.detail.value ?? '')}
+            />
+            <IonButton
+              expand="block"
+              type="button"
+              className="contact-send-btn"
+              disabled={sending}
+              onClick={handleSendMessage}
+            >
+              <IonIcon icon={checkmarkCircleOutline} slot="start" />
+              Send Message
+            </IonButton>
           </div>
         )}
 

@@ -1222,7 +1222,12 @@ const DestinationDetail: React.FC = () => {
                         {rev.anonymous ? (
                           <span>?</span>
                         ) : displayAvatar ? (
-                          <img src={displayAvatar} alt={rev.author} onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }} />
+                          <img
+                            src={displayAvatar}
+                            alt={rev.author}
+                            onClick={() => setLightbox({ photos: [{ url: displayAvatar }], index: 0 })}
+                            onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+                          />
                         ) : (
                           <span>{rev.author[0]?.toUpperCase()}</span>
                         )}
@@ -1265,7 +1270,13 @@ const DestinationDetail: React.FC = () => {
                             const profileImg = rev.userId ? userProfileMap[rev.userId]?.img : undefined;
                             const displayAvatar = profileImg || rev.avatar;
                             if (displayAvatar) {
-                              return <img src={displayAvatar} alt={rev.author} />;
+                              return (
+                                <img
+                                  src={displayAvatar}
+                                  alt={rev.author}
+                                  onClick={() => setLightbox({ photos: [{ url: displayAvatar }], index: 0 })}
+                                />
+                              );
                             }
                             return <span>{rev.author[0]?.toUpperCase()}</span>;
                           })()}
@@ -1307,7 +1318,12 @@ const DestinationDetail: React.FC = () => {
                                   const profileAvatar = reply.userId ? userProfileMap[reply.userId]?.img : undefined;
                                   const displayAvatar = profileAvatar || reply.avatar || (reply.userId === user?.uid ? getProfilePicCache() : null);
                                   return displayAvatar ? (
-                                  <img src={displayAvatar} alt={reply.authorName} onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }} />
+                                  <img
+                                    src={displayAvatar}
+                                    alt={reply.authorName}
+                                    onClick={() => setLightbox({ photos: [{ url: displayAvatar }], index: 0 })}
+                                    onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+                                  />
                                 ) : (
                                   <span>{reply.authorName?.[0]?.toUpperCase() || 'U'}</span>
                                   );
@@ -1371,7 +1387,11 @@ const DestinationDetail: React.FC = () => {
                               const displayAvatar = profile?.img || user?.photoURL || getProfilePicCache();
                               const displayName = profile?.name || user?.displayName || 'You';
                               return displayAvatar
-                                ? <img src={displayAvatar} alt={displayName} />
+                                ? <img
+                                    src={displayAvatar}
+                                    alt={displayName}
+                                    onClick={() => setLightbox({ photos: [{ url: displayAvatar }], index: 0 })}
+                                  />
                                 : <span>{displayName[0].toUpperCase()}</span>;
                             })()}
                           </div>
@@ -1668,16 +1688,20 @@ const DestinationDetail: React.FC = () => {
           <div className="dd-lightbox-overlay" onClick={() => setLightbox(null)}>
             <div className="dd-lightbox-inner" onClick={(e) => e.stopPropagation()}>
               <button className="dd-lightbox-close" onClick={() => setLightbox(null)} aria-label="Close">×</button>
-              <button
-                className="dd-lightbox-arrow dd-lightbox-arrow--prev"
-                onClick={() => setLightbox(prev => prev ? { ...prev, index: (prev.index - 1 + prev.photos.length) % prev.photos.length } : null)}
-                aria-label="Previous"
-              >‹</button>
-              <button
-                className="dd-lightbox-arrow dd-lightbox-arrow--next"
-                onClick={() => setLightbox(prev => prev ? { ...prev, index: (prev.index + 1) % prev.photos.length } : null)}
-                aria-label="Next"
-              >›</button>
+              {lightbox.index > 0 && (
+                <button
+                  className="dd-lightbox-arrow dd-lightbox-arrow--prev"
+                  onClick={() => setLightbox(prev => prev ? { ...prev, index: prev.index - 1 } : null)}
+                  aria-label="Previous"
+                >‹</button>
+              )}
+              {lightbox.index < lightbox.photos.length - 1 && (
+                <button
+                  className="dd-lightbox-arrow dd-lightbox-arrow--next"
+                  onClick={() => setLightbox(prev => prev ? { ...prev, index: prev.index + 1 } : null)}
+                  aria-label="Next"
+                >›</button>
+              )}
               <div className="dd-lightbox-img-wrap">
                 <img className="dd-lightbox-img" src={lightbox.photos[lightbox.index].url} alt={`Photo ${lightbox.index + 1}`} />
               </div>

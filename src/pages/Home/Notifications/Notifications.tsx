@@ -7,7 +7,7 @@ import {
 import {
   heart, star, location, informationCircle,
   notifications, checkmarkDone, qrCode,
-  chatbubbleEllipsesOutline,
+  chatbubbleEllipsesOutline, calendarOutline,
 } from 'ionicons/icons';
 import { useAuth } from '../../../context/AuthContext';
 import {
@@ -31,6 +31,7 @@ const TYPE_META: Record<NotifType, { icon: string; cls: string }> = {
   visit:       { icon: qrCode,             cls: 'location'    },
   reply:       { icon: heart,              cls: 'reply'       },
   destination: { icon: location,           cls: 'destination' },
+  reserved:    { icon: calendarOutline,    cls: 'info'        },
   new_message: { icon: chatbubbleEllipsesOutline, cls: 'info' },
 };
 
@@ -46,6 +47,10 @@ function getSection(iso: string): Section {
 }
 
 const SECTIONS: Section[] = ['Today', 'This Week', 'Earlier'];
+
+function isReservationNotification(notif: AppNotification): boolean {
+  return notif.type === 'reserved' || notif.title === 'Tour Joined';
+}
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
@@ -71,10 +76,12 @@ const Notifications: React.FC = () => {
   // ── Actions ─────────────────────────────────────────────────────────────────
 
   const handleMarkRead = (notif: AppNotification) => {
-    if (!notif.unread || !user?.uid) return;
-    // Optimistic UI update
-    setNotifs(prev => prev.map(n => n.id === notif.id ? { ...n, unread: false } : n));
-    markNotifRead(user.uid, notif.id);
+    if (notif.unread && user?.uid) {
+      // Optimistic UI update
+      setNotifs(prev => prev.map(n => n.id === notif.id ? { ...n, unread: false } : n));
+      markNotifRead(user.uid, notif.id);
+    }
+
   };
 
   const handleMarkAllRead = () => {
@@ -153,7 +160,9 @@ const Notifications: React.FC = () => {
                   <p className="notif-section-label">{section}</p>
 
                   {items.map(notif => {
-                    const meta = TYPE_META[notif.type] ?? TYPE_META.info;
+                    const meta = isReservationNotification(notif)
+                      ? TYPE_META.reserved
+                      : TYPE_META[notif.type] ?? TYPE_META.info;
                     return (
                       <div
                         key={notif.id}
