@@ -213,7 +213,11 @@
   object-fit: contain;
   z-index: 1;
   pointer-events: none;
+<<<<<<< HEAD
   bottom: -100; 
+=======
+  margin: 0 auto;
+>>>>>>> origin/main
   border-radius: 28px;
   flex-shrink: 0;
 }
@@ -506,11 +510,17 @@
 .ai-route-mode-switch button {
   border: 0;
   border-radius: 7px;
+<<<<<<< HEAD
   padding: 7px 10px;
   padding: 6px 9px;
   background: transparent;
   color: #374151;
   font-size: 12px;
+=======
+  padding: 6px 9px;
+  background: transparent;
+  color: #374151;
+>>>>>>> origin/main
   font-size: 11.5px;
   font-weight: 700;
   cursor: pointer;

@@ -80,5 +80,8 @@ export interface Destination {
   reviewsSummary?: string;
   ecoFeatures?: string;
   infoBlocks?: InfoBlock[];
+<<<<<<< HEAD
   recommended?: boolean;
+=======
+>>>>>>> origin/main
 }

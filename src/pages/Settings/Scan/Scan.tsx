@@ -27,7 +27,11 @@ import { useProximityAIOptional } from '../../../context/Proximityaicontext';
 import { auth, firestore } from '../../../firebase';
 import { Destination } from '../../../types';
 import { createNotification, notifyVisitRecorded } from '../../../services/notificationsService';
+<<<<<<< HEAD
 import { addTouristToSession, checkInTouristToSession } from '../../../services/sessionService';
+=======
+import { checkInTouristToSession } from '../../../services/sessionService';
+>>>>>>> origin/main
 
 import './Scan.css';
 
@@ -261,6 +265,7 @@ const Scan: React.FC = () => {
           return;
         }
 
+<<<<<<< HEAD
         // Scanning the guide's QR IS how a tourist joins this session — the
         // session doc is created empty (no touristUids) by GenerateQR.tsx,
         // so checkInTouristToSession() alone would always reject with
@@ -281,6 +286,8 @@ const Scan: React.FC = () => {
           email: profile?.email || user.email || '',
           joinedAt: new Date().toISOString(),
         });
+=======
+>>>>>>> origin/main
         await checkInTouristToSession(sessionId, user.uid);
         await createNotification({
           userId: user.uid,

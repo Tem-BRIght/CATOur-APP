@@ -6,6 +6,7 @@ service cloud.firestore {
     }
 
     function isAdmin() {
+<<<<<<< HEAD
       return isSignedIn() && (
         (exists(/databases/$(database)/documents/admins/$(request.auth.uid)) &&
          get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.role in ['admin', 'super-admin']) ||
@@ -29,6 +30,19 @@ service cloud.firestore {
         (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'super-admin')
       );
+=======
+      return isSignedIn() && exists(/databases/$(database)/documents/admins/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.role in ['admin', 'super-admin'];
+    }
+
+    function isGuide() {
+      return isSignedIn() && exists(/databases/$(database)/documents/tourGuides/$(request.auth.uid));
+    }
+
+    function isSuperAdmin() {
+      return isSignedIn() && exists(/databases/$(database)/documents/admins/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.role == 'super-admin';
+>>>>>>> origin/main
     }
 
     function isOwner(uid) {
@@ -46,7 +60,11 @@ service cloud.firestore {
       return isSignedIn() && data.participants is list &&
         data.participants.hasAny([request.auth.uid]);
     }
+<<<<<<< HEAD
 
+=======
+ 
+>>>>>>> origin/main
     match /admins/{adminId} {
       allow read: if isSignedIn() && (request.auth.uid == adminId || isAdmin());
       allow create: if isSignedIn() && (request.auth.uid == adminId || isSuperAdmin());
@@ -65,7 +83,11 @@ service cloud.firestore {
       allow create: if isOwner(uid) || isAdmin();
       allow update: if isOwner(uid) || isAdmin() || (
         isSignedIn() &&
+<<<<<<< HEAD
         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['availabilitySlots', 'updatedAt'])
+=======
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['availabilitySlots'])
+>>>>>>> origin/main
       );
       allow delete: if isAdmin();
     }
@@ -144,19 +166,76 @@ service cloud.firestore {
         request.resource.data.guideId == request.auth.uid
       ) || (
         isSignedIn() &&
+<<<<<<< HEAD
         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['tourists', 'touristUids', 'cancelledUids', 'checkedInUids', 'updatedAt'])
+=======
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['tourists', 'touristUids']) &&
+        resource.data.touristUids is list &&
+        request.resource.data.touristUids is list &&
+        request.resource.data.tourists is list &&
+        request.resource.data.touristUids.hasAll(resource.data.touristUids) &&
+        request.resource.data.touristUids.hasAny([request.auth.uid]) &&
+        request.resource.data.touristUids.size() == resource.data.touristUids.size() + 1 &&
+        request.resource.data.tourists.size() == resource.data.tourists.size() + 1
+      ) || (
+        isSignedIn() &&
+        resource.data.touristUids is list && resource.data.touristUids.hasAny([request.auth.uid]) &&
+        resource.data.cancelledUids is list && resource.data.cancelledUids.hasAny([request.auth.uid]) &&
+        request.resource.data.touristUids is list &&
+        request.resource.data.touristUids.size() == resource.data.touristUids.size() &&
+        request.resource.data.tourists is list &&
+        request.resource.data.tourists.size() == resource.data.tourists.size() + 1 &&
+        request.resource.data.cancelledUids is list &&
+        !request.resource.data.cancelledUids.hasAny([request.auth.uid]) &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['tourists', 'touristUids', 'cancelledUids'])
+      ) || (
+        isSignedIn() && resource.data.status == 'pending' &&
+        resource.data.touristUids is list && resource.data.touristUids.hasAny([request.auth.uid]) &&
+        request.resource.data.touristUids is list &&
+        request.resource.data.tourists is list &&
+        request.resource.data.tourists.size() == resource.data.tourists.size() &&
+        request.resource.data.cancelledUids is list &&
+        (!('cancelledUids' in resource.data) || request.resource.data.cancelledUids.hasAll(resource.data.cancelledUids)) &&
+        request.resource.data.cancelledUids.hasAny([request.auth.uid]) &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['tourists', 'touristUids', 'cancelledUids', 'checkedInUids'])
+      ) || (
+        isSignedIn() &&
+        resource.data.touristUids is list &&
+        resource.data.touristUids.hasAny([request.auth.uid]) &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['checkedInUids']) &&
+        request.resource.data.checkedInUids is list &&
+        ((!('checkedInUids' in resource.data) && request.resource.data.checkedInUids.size() > 0) ||
+         (resource.data.checkedInUids is list && request.resource.data.checkedInUids.hasAll(resource.data.checkedInUids))) &&
+        request.resource.data.checkedInUids.hasAny([request.auth.uid])
+>>>>>>> origin/main
       );
       allow delete: if isSignedIn() && (resource.data.guideId == request.auth.uid || isAdmin());
     }
 
     match /bookings/{id} {
       allow read: if isAdmin() || isSignedIn();
+<<<<<<< HEAD
       allow create, update: if isAdmin() || isGuide() || isSignedIn();
+=======
+      allow create: if isAdmin() || (
+        isSignedIn() && request.resource.data.guideId == request.auth.uid
+      );
+      allow update: if isAdmin() || (
+        isSignedIn() && resource.data.guideId == request.auth.uid &&
+        request.resource.data.guideId == request.auth.uid
+      ) || (
+        isSignedIn() &&
+        isSessionParticipant(get(/databases/$(database)/documents/sessions/$(id)).data) &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['tourists', 'updatedAt']) &&
+        request.resource.data.guideId == resource.data.guideId
+      );
+>>>>>>> origin/main
       allow delete: if isAdmin();
     }
 
     match /visits/{visitId} {
       allow read: if isSignedIn();
+<<<<<<< HEAD
       allow create, update: if isSignedIn() && (
         !('userId' in request.resource.data) ||
         request.resource.data.userId == request.auth.uid ||
@@ -167,6 +246,19 @@ service cloud.firestore {
          get(/databases/$(database)/documents/sessions/$(request.resource.data.sessionId)).data.guideId == request.auth.uid)
       );
       allow delete: if isAdmin() || (
+=======
+      allow create: if isSignedIn() && (
+        !('userId' in request.resource.data) ||
+        request.resource.data.userId == request.auth.uid ||
+        isAdmin() ||
+        (request.resource.data.sessionId is string &&
+         exists(/databases/$(database)/documents/sessions/$(request.resource.data.sessionId)) &&
+         get(/databases/$(database)/documents/sessions/$(request.resource.data.sessionId)).data.guideId == request.auth.uid &&
+         get(/databases/$(database)/documents/sessions/$(request.resource.data.sessionId)).data.checkedInUids is list &&
+         get(/databases/$(database)/documents/sessions/$(request.resource.data.sessionId)).data.checkedInUids.hasAny([request.resource.data.userId]))
+      );
+      allow update, delete: if isAdmin() || (
+>>>>>>> origin/main
         isSignedIn() && resource.data.userId == request.auth.uid
       );
     }
@@ -235,9 +327,19 @@ service cloud.firestore {
 
     match /feedback/{feedbackId} {
       allow read: if true;
+<<<<<<< HEAD
       allow create, update: if isAdmin() || (isSignedIn() && request.resource.data.touristId == request.auth.uid &&
         request.resource.data.sessionId is string);
       allow delete: if isAdmin() || (isSignedIn() && resource.data.touristId == request.auth.uid);
+=======
+      allow create: if isAdmin() || (isSignedIn() && request.resource.data.touristId == request.auth.uid &&
+        request.resource.data.sessionId is string &&
+        exists(/databases/$(database)/documents/sessions/$(request.resource.data.sessionId)) &&
+        get(/databases/$(database)/documents/sessions/$(request.resource.data.sessionId)).data.status == 'ended' &&
+        get(/databases/$(database)/documents/sessions/$(request.resource.data.sessionId)).data.checkedInUids is list &&
+        get(/databases/$(database)/documents/sessions/$(request.resource.data.sessionId)).data.checkedInUids.hasAny([request.auth.uid]));
+      allow update, delete: if isAdmin() || (isSignedIn() && resource.data.touristId == request.auth.uid);
+>>>>>>> origin/main
     }
 
     match /activityLog/{activityId} {
@@ -288,7 +390,11 @@ service cloud.firestore {
 
     match /counters/{counterId} {
       allow read: if isSignedIn();
+<<<<<<< HEAD
       allow create, update: if isAdmin() || isGuide() || isSignedIn();
+=======
+      allow create, update: if isAdmin() || isGuide();
+>>>>>>> origin/main
       allow delete: if isAdmin();
     }
 

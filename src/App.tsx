@@ -103,12 +103,17 @@ import ErrorBoundary from './components/ErrorBoundary';
 
 setupIonicReact();
 
+<<<<<<< HEAD
 interface ProtectedViewProps {
+=======
+interface ProtectedRouteProps {
+>>>>>>> origin/main
   component: React.ComponentType<any>;
   allowedRole: Exclude<UserRole, null>;
   [key: string]: any;
 }
 
+<<<<<<< HEAD
 const ProtectedView: React.FC<ProtectedViewProps> = ({
   component: Component,
   allowedRole,
@@ -132,6 +137,30 @@ const ProtectedView: React.FC<ProtectedViewProps> = ({
     );
   }
   return <Component {...restProps} />;
+=======
+const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
+  component: Component,
+  allowedRole,
+  ...routeProps
+}) => {
+  const { authLoading, authError, isAuthenticated, mustChangePassword, role } = useAuth();
+
+  return (
+    <Route
+      {...routeProps}
+      render={props => {
+        if (authLoading) return <Redirect to="/splash" />;
+        if (!isAuthenticated || authError || !role) return <Redirect to="/login" />;
+        if (role !== allowedRole) {
+          return <Redirect to={role === 'tourguide'
+            ? (mustChangePassword ? '/tourguide/change-password' : '/tourguide/home')
+            : '/home'} />;
+        }
+        return <Component {...props} />;
+      }}
+    />
+  );
+>>>>>>> origin/main
 };
 
 const App: React.FC = () => {
@@ -162,7 +191,11 @@ const App: React.FC = () => {
               {/* ── Splash ────────────────────────────────────────────────────── */}
             <Route exact path="/splash"         component={SplashScreen}      />
 
+<<<<<<< HEAD
               {/* ── Auth ──────────────────────────────────────────────────────── */}
+=======
+            {/* ── Auth ──────────────────────────────────────────────────────── */}
+>>>>>>> origin/main
             <Route exact path="/login"          component={Login}             />
             <Route exact path="/reset-password" component={ResetPassword}     />
             <Route exact path="/signUp1"        component={SignUP1}           />
@@ -171,6 +204,7 @@ const App: React.FC = () => {
             <Route exact path="/terms-signup"   component={TermsSignup}       />
             <Route exact path="/googleUser"     component={GoogleUserProfile} />
             
+<<<<<<< HEAD
               {/* ── Main app ──────────────────────────────────────────────────── */}
             <Route exact path="/home"           render={props => <ProtectedView component={Home} allowedRole="user" {...props} />} />
             <Route exact path="/popular"        render={props => <ProtectedView component={PopularAll} allowedRole="user" {...props} />} />
@@ -215,6 +249,55 @@ const App: React.FC = () => {
             <Route exact path="/reviews/:sessionId?/:guideId?" component={Reviews} />
 
               {/* ── Default: show loading first ────────────────────────────────── */}
+=======
+            {/* ── Main app ──────────────────────────────────────────────────── */}
+            <ProtectedRoute exact path="/home"           component={Home}              allowedRole="user" />
+            <ProtectedRoute exact path="/popular"        component={PopularAll}        allowedRole="user" />
+            <ProtectedRoute exact path="/recommended"    component={RecommendedAll}    allowedRole="user" />
+            <ProtectedRoute exact path="/notifications"  component={Notifications}     allowedRole="user" />
+            <ProtectedRoute exact path="/maps"           component={MapPage}           allowedRole="user" />
+            <ProtectedRoute path="/destination/:id"      component={DestinationDetail} allowedRole="user" />
+            
+            <ProtectedRoute exact path="/ai-guide"       component={AIGuide}           allowedRole="user" />
+
+            {/* ── Settings ──────────────────────────────────────────────────── */}
+            <ProtectedRoute exact path="/settings"       component={Settings}          allowedRole="user" />
+            <ProtectedRoute exact path="/profile"        component={Profile}           allowedRole="user" />
+            <ProtectedRoute exact path="/favorites"      component={Favorites}         allowedRole="user" />
+            <ProtectedRoute exact path="/my-reviews"     component={MyReviews}         allowedRole="user" />
+            <ProtectedRoute exact path="/tour"           component={BookingHistory}    allowedRole="user" />
+            <ProtectedRoute exact path="/scan"           component={Scan}              allowedRole="user" />
+            <ProtectedRoute exact path="/settings/verify-email" component={VerifyEmail} allowedRole="user" />
+            <ProtectedRoute exact path="/settings/verify-phone" component={VerifyPhone} allowedRole="user" />
+            <ProtectedRoute exact path="/settings/change-password" component={ChangePassword} allowedRole="user" />
+            <ProtectedRoute exact path="/settings/about" component={About}             allowedRole="user" />
+            <ProtectedRoute exact path="/settings/permissions" component={Permissions} allowedRole="user" />
+            <ProtectedRoute exact path="/settings/help"  component={Help}              allowedRole="user" />
+            <ProtectedRoute exact path="/settings/report-problem" component={ReportProblem} allowedRole="user" />
+            <ProtectedRoute exact path="/settings/contact-support" component={ContactSupport} allowedRole="user" />
+            <ProtectedRoute exact path="/support-chat/:ticketId" component={SupportChat} allowedRole="user" />
+            <ProtectedRoute exact path="/settings/terms"          component={Terms}             allowedRole="user" />
+
+            {/* ── Destination detail ────────────────────────────────────────── */}
+
+            
+            {/* ── Tourguide ─────────────────────────────────────────────────── */}
+            <ProtectedRoute exact path="/tourguide/home"            component={TourGuideHome}     allowedRole="tourguide" />
+            <ProtectedRoute exact path="/tourguide/profile"         component={TourGuideProfile}  allowedRole="tourguide" />
+            <ProtectedRoute exact path="/tourguide/history"         component={TourGuideHistory}  allowedRole="tourguide" />
+            <ProtectedRoute exact path="/tourguide/list/:sessionId?" component={TourGuideList}     allowedRole="tourguide" />
+            <ProtectedRoute exact path="/feedback-qr/:sessionId"    component={FeedbackQR}        allowedRole="tourguide" />
+            <ProtectedRoute exact path="/tourguide/generateQR"      component={GenerateQR}        allowedRole="tourguide" />
+            <ProtectedRoute exact path="/tourguide/change-password" component={TouristChangepass} allowedRole="tourguide" />
+            <ProtectedRoute exact path="/tourguide/analytics"       component={TourGuideAnalytics} allowedRole="tourguide" />
+
+            {/* ── Tour Session (tourist view) ────────────────────────────────── */}
+            <ProtectedRoute exact path="/tour-session/:sessionId"   component={TourSession}      allowedRole="user" />
+            <ProtectedRoute exact path="/feedback/:sessionId" component={Tourguidefeedback} allowedRole="user" />
+            <Route exact path="/reviews/:sessionId?/:guideId?" component={Reviews} />
+
+            {/* ── Default: show loading first ────────────────────────────────── */}
+>>>>>>> origin/main
             <Route exact path="/" render={() => <Redirect to="/splash" />} />
             <Route render={() => <Redirect to="/login" />} />
 

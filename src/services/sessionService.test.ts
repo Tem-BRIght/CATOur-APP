@@ -180,8 +180,13 @@ describe('tour booking conflict validation', () => {
         data: () => ({
           availabilitySlots: [{
             date: '2026-08-28',
+<<<<<<< HEAD
             startTime: '23:00',
             endTime: '23:59',
+=======
+            startTime: '10:00',
+            endTime: '12:00',
+>>>>>>> origin/main
             maxSpots: 10,
             bookedCount: 0,
             joinedUserIds: [],

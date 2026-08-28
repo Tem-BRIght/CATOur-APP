@@ -133,12 +133,21 @@
 
 /* ─── HORIZONTAL SCROLL ──────────────────────────────────── */
 .horizontal-scroll {
+<<<<<<< HEAD
   display: flex;
   gap: 15px;
   overflow-x: auto;
   padding: 8px 4px 16px;
   scroll-snap-type: x mandatory;
   -webkit-overflow-scrolling: touch;
+=======
+  height: 100%;
+  display: flex;
+  gap: 15px;
+  overflow-x: auto;
+  padding: 12px;
+  scroll-snap-type: x mandatory;
+>>>>>>> origin/main
 }
 
 .horizontal-scroll::-webkit-scrollbar {

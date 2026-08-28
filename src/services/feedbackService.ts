@@ -40,6 +40,19 @@ export interface GuideFeedbackInput {
   comment?: string;
 }
 
+<<<<<<< HEAD
+=======
+export interface GuideFeedback extends GuideFeedbackInput {
+  id: string;
+  destinationId: string;
+  destinationName: string;
+  touristName: string;
+  categoryRatings: NonNullable<GuideFeedbackInput['categoryRatings']>;
+  comment: string;
+  createdAt?: unknown;
+}
+
+>>>>>>> origin/main
 // ── Firestore refs ────────────────────────────────────────────────────────────
 
 const feedbackCol = () => collection(firestore, 'feedback');
@@ -68,20 +81,35 @@ export async function hasSubmittedFeedback(
   }
 }
 
+<<<<<<< HEAD
 export interface GuideFeedbackDoc extends Partial<GuideFeedbackInput> {
   id: string;
   createdAt?: any;
 }
 
+=======
+>>>>>>> origin/main
 /**
  * getFeedback
  * Fetches the tourist's own feedback doc for this session (e.g. to pre-fill
  * the form if they navigate back to it before it's disabled).
  */
+<<<<<<< HEAD
 export async function getFeedback(sessionId: string, touristId: string): Promise<GuideFeedbackDoc | null> {
   try {
     const snap = await getDoc(doc(feedbackCol(), feedbackDocId(sessionId, touristId)));
     return snap.exists() ? ({ id: snap.id, ...snap.data() } as GuideFeedbackDoc) : null;
+=======
+export async function getFeedback(
+  sessionId: string,
+  touristId: string,
+): Promise<GuideFeedback | null> {
+  try {
+    const snap = await getDoc(doc(feedbackCol(), feedbackDocId(sessionId, touristId)));
+    return snap.exists()
+      ? { id: snap.id, ...(snap.data() as Omit<GuideFeedback, 'id'>) }
+      : null;
+>>>>>>> origin/main
   } catch (err) {
     console.error('[feedbackService] getFeedback failed:', err);
     return null;

@@ -28,7 +28,15 @@ export interface UserProfile {
   nickname?:          string;
   img?:               string | null;
   nationality?:       string;
+<<<<<<< HEAD
   address?:           string;
+=======
+  // Keep `address` as the freeform string (signup/admin may set this)
+  address?:           UserAddress | string;
+  // New: always store a structured form alongside the string to enable
+  // reliable reads by admin UIs and queries.
+  addressStructured?: UserAddress;
+>>>>>>> origin/main
   contactNumber?:     string;
   gender?:            string;
   religion?:          string;
@@ -47,6 +55,7 @@ export interface UserProfile {
 
 const userRef = (uid: string) => doc(firestore, 'users', uid);
 
+<<<<<<< HEAD
 function cleanAddressString(address?: any): string {
   if (!address) return '';
   if (typeof address === 'string') return address.trim();
@@ -56,6 +65,32 @@ function cleanAddressString(address?: any): string {
     return parts.join(', ');
   }
   return String(address).trim();
+=======
+function buildAddressFields(address?: UserAddress | string) {
+  if (!address) return { addressString: '', addressStructured: { region: '', city: '', brgy: '' } };
+
+  if (typeof address === 'string') {
+    const raw = address.trim();
+    // Try to split into brgy, city, region when comma-separated
+    const parts = raw.split(',').map(p => p.trim()).filter(Boolean);
+    if (parts.length >= 3) {
+      return { addressString: raw, addressStructured: { brgy: parts[0], city: parts[1], region: parts[2] } };
+    }
+    if (parts.length === 2) {
+      return { addressString: raw, addressStructured: { brgy: '', city: parts[0], region: parts[1] } };
+    }
+    return { addressString: raw, addressStructured: { brgy: '', city: raw, region: '' } };
+  }
+
+  return {
+    addressString: [address.brgy, address.city, address.region].filter(Boolean).join(', '),
+    addressStructured: {
+      region: address.region ?? '',
+      city:   address.city ?? '',
+      brgy:   address.brgy ?? '',
+    },
+  };
+>>>>>>> origin/main
 }
 
 // ── CRUD ──────────────────────────────────────────────────────────────────────
@@ -65,6 +100,10 @@ export const createUserProfile = async (
   profileData: Partial<UserProfile>,
 ): Promise<void> => {
   try {
+<<<<<<< HEAD
+=======
+    const { addressString, addressStructured } = buildAddressFields(profileData.address as any);
+>>>>>>> origin/main
     const data = {
       name: profileData.name || { firstname: '', surname: '', suffix: '' },
       email:             profileData.email             || '',
@@ -73,7 +112,13 @@ export const createUserProfile = async (
       nationality:       profileData.nationality       || '',
       nickname:          profileData.nickname          || '',
       img:               profileData.img               ?? null,
+<<<<<<< HEAD
       address:           cleanAddressString(profileData.address),
+=======
+      // store both the freeform string and the structured parts
+      address:           addressString || '',
+      addressStructured: addressStructured || { region: '', city: '', brgy: '' },
+>>>>>>> origin/main
       contactNumber:     profileData.contactNumber     || '',
       gender:            profileData.gender            || '',
       religion:          profileData.religion          || '',
@@ -105,7 +150,16 @@ const TRACKED_FIELDS: { check: (p: UserProfile) => boolean }[] = [
   { check: p => !!p.gender?.trim() },
   { check: p => !!p.nationality?.trim() },
   { check: p => !!p.religion?.trim() },
+<<<<<<< HEAD
   { check: p => !!p.address && String(p.address).trim().length > 0 },
+=======
+  { check: p => {
+      if (!p.address) return false;
+      if (typeof p.address === 'string') return !!p.address.trim();
+      return !!(p.address.region || p.address.city || p.address.brgy);
+    }
+  },
+>>>>>>> origin/main
   { check: p => !!p.img },
 ];
 
@@ -118,12 +172,16 @@ export function getProfileCompletion(profile: UserProfile | null): number {
 export const getUserProfile = async (userId: string): Promise<UserProfile | null> => {
   try {
     const snap = await getDoc(userRef(userId));
+<<<<<<< HEAD
     if (!snap.exists()) return null;
     const data = snap.data() as UserProfile;
     if (data.address && typeof data.address !== 'string') {
       data.address = cleanAddressString(data.address);
     }
     return data;
+=======
+    return snap.exists() ? (snap.data() as UserProfile) : null;
+>>>>>>> origin/main
   } catch (err: any) {
     const code = typeof err?.code === 'string' ? err.code.toLowerCase() : '';
     const message = typeof err?.message === 'string' ? err.message.toLowerCase() : '';
@@ -144,9 +202,18 @@ export const updateUserProfile = async (
   profileData: Partial<UserProfile>,
 ): Promise<void> => {
   try {
+<<<<<<< HEAD
     const payload: Record<string, any> = { ...profileData } as Record<string, any>;
     if (profileData.address !== undefined) {
       payload.address = cleanAddressString(profileData.address);
+=======
+    // If address is provided, expand it into both string + structured fields
+    const payload: Record<string, any> = { ...profileData } as Record<string, any>;
+    if (profileData.address !== undefined) {
+      const { addressString, addressStructured } = buildAddressFields(profileData.address as any);
+      payload.address = addressString;
+      payload.addressStructured = addressStructured;
+>>>>>>> origin/main
     }
 
     await setDoc(userRef(userId), payload, { merge: true });

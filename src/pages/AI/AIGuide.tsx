@@ -40,7 +40,10 @@ import { speak as speakTts, stop as stopTts, pause as pauseTts, resume as resume
 import { getProfilePicCache } from '../../utils/profileImageStorage';
 import { safeVibrate } from '../../utils/vibration';
 import { DirectionsRenderer, GoogleMap, LoadScript, MarkerF } from '@react-google-maps/api';
+<<<<<<< HEAD
 import { Capacitor } from '@capacitor/core';
+=======
+>>>>>>> origin/main
 import './AIGuide.css';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -577,6 +580,7 @@ const AIGuide: React.FC = () => {
   // ── Load voices once & auto-speak welcome ─────────────────────────────────
 
   useEffect(() => {
+<<<<<<< HEAD
     const speakWelcome = () => {
       if (!mountedRef.current || isMutedRef.current) return;
       // Small delay so the UI has settled before speaking
@@ -601,6 +605,27 @@ const AIGuide: React.FC = () => {
           window.speechSynthesis.onvoiceschanged = null; // fire once only
         };
       }
+=======
+    if (!window.speechSynthesis) return;
+
+    const speakWelcome = () => {
+      if (!mountedRef.current) return;
+      // Small delay so the UI has settled before speaking
+      setTimeout(() => {
+        if (mountedRef.current) speakMessage(WELCOME_MESSAGE, 0);
+      }, 600);
+    };
+
+    const voices = window.speechSynthesis.getVoices();
+    if (voices.length > 0) {
+      speakWelcome();
+    } else {
+      window.speechSynthesis.onvoiceschanged = () => {
+        window.speechSynthesis.getVoices();
+        speakWelcome();
+        window.speechSynthesis.onvoiceschanged = null; // fire once only
+      };
+>>>>>>> origin/main
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -795,7 +820,11 @@ const AIGuide: React.FC = () => {
       rate: voiceSpeedRef.current,
       gender: voiceGenderRef.current,
       muted: isMutedRef.current,
+<<<<<<< HEAD
       lang: 'en-US',
+=======
+      lang: 'fil-PH',
+>>>>>>> origin/main
       onEnd: () => {
         if (!mountedRef.current) return;
         setSpeakingMessageId(null);
@@ -993,7 +1022,11 @@ const AIGuide: React.FC = () => {
     start: startListening,
     stop: stopListeningInternal,
   } = useSpeechRecognition({
+<<<<<<< HEAD
     lang: 'en-US',
+=======
+    lang: 'fil-PH',
+>>>>>>> origin/main
     onFinalResult: handleFinalTranscript,
     onError: showError,
   });

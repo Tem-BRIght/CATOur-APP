@@ -264,7 +264,11 @@ export async function getTourTypesWithSchedules(): Promise<TourTypeWithSchedules
 
   const result: TourTypeWithSchedules[] = [];
 
+<<<<<<< HEAD
   // 3. For each tour type, find matching guides with an available slot
+=======
+  // 3. For each tour type, find matching guides with a slot assigned TODAY
+>>>>>>> origin/main
   for (const [typeId, typeInfo] of tourTypesMap) {
     const guides: TourGuideSchedule[] = [];
 
@@ -272,6 +276,7 @@ export async function getTourTypesWithSchedules(): Promise<TourTypeWithSchedules
       const guideData = guideDoc.data();
       const tourTypeIds = resolveGuideTourTypeIds(guideData, tourTypesMap);
 
+<<<<<<< HEAD
       if (!tourTypeIds.includes(typeId)) continue;
 
       const rawSlots: any[] = guideData.availabilitySlots || [];
@@ -290,14 +295,36 @@ export async function getTourTypesWithSchedules(): Promise<TourTypeWithSchedules
       if (taggedSlots.length === 0) continue;
 
       console.debug(`[tourScheduleService] type=${typeId} guide=${guideDoc.id} slots=${taggedSlots.length}`);
+=======
+      // Check if this guide offers this tour type. This falls back to the
+      // guide's assigned destination IDs when older docs or partial writes
+      // have no explicit tourTypeIds array yet.
+      if (!tourTypeIds.includes(typeId)) continue;
+
+      const rawSlots: any[] = guideData.availabilitySlots || [];
+      // Tag each slot with its ORIGINAL array position before filtering —
+      // this is the rawIndex joinTour() needs.
+      const upcomingSlots = rawSlots
+        .map((s, rawIndex) => ({ ...s, rawIndex }))
+        .filter((s) => isSlotJoinable({ ...s, bookedCount: s.bookedCount ?? s.sessionCount ?? 0 }));
+
+      if (upcomingSlots.length === 0) continue;
+
+      console.debug(`[tourScheduleService] type=${typeId} guide=${guideDoc.id} upcomingSlots=${upcomingSlots.length}`);
+>>>>>>> origin/main
       guides.push({
         guideId: guideDoc.id,
         guideName: `${guideData.firstName || ''} ${guideData.lastName || ''}`.trim() || 'Unknown Guide',
         guidePhotoUrl: guideData.photoUrl || guideData.img || '',
         destinationName: guideData.assignedDestName || 'Unknown',
         destinationId: guideData.assignedDestId || '',
+<<<<<<< HEAD
         date: taggedSlots[0]?.date || today,
         slots: taggedSlots.map((s) => ({
+=======
+        date: upcomingSlots[0]?.date || today,
+        slots: upcomingSlots.map((s) => ({
+>>>>>>> origin/main
           startTime: s.startTime,
           endTime: s.endTime,
           maxSpots: s.maxSpots ?? 10,

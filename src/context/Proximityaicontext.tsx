@@ -132,12 +132,16 @@ interface ProximityDestination {
   description?: string;
   category?: string;
   hours?: string;
+<<<<<<< HEAD
   admission?: string;
+=======
+>>>>>>> origin/main
   address?: string;
   lat: number;
   lng: number;
 }
 
+<<<<<<< HEAD
 function generateProximityQAFallback(dest: ProximityDestination | null, question: string): string {
   const q = question.toLowerCase();
   if (!dest) {
@@ -174,6 +178,8 @@ function generateProximityQAFallback(dest: ProximityDestination | null, question
     : `You are currently viewing ${title} in Pasig City. Feel free to ask about its hours, admission, or nearby spots.`;
 }
 
+=======
+>>>>>>> origin/main
 interface ProximityAIContextValue {
   status: ProximityStatus;
   destination: ProximityDestination | null;
@@ -246,7 +252,10 @@ function toProximityDestination(dest: GeofenceDestination): ProximityDestination
     description: dd.desc || dd.description || '',
     category:    dd.category || '',
     hours:       dd.hours || '',
+<<<<<<< HEAD
     admission:   dd.admission || dd.entranceFee || '',
+=======
+>>>>>>> origin/main
     address:     dd.address || '',
     lat:         dd.location?.lat ?? dd.locationCoords?.lat ?? dd.lat,
     lng:         dd.location?.lng ?? dd.locationCoords?.lng ?? dd.lng,
@@ -507,6 +516,7 @@ export const ProximityAIProvider: React.FC<{ children: React.ReactNode }> = ({ c
     try {
       logAIActivity(uid, 'askQuestion', dest ? { id: dest.id, title: dest.title, name: dest.name } : undefined, trimmed);
       const activeId = activeIdRef.current;
+<<<<<<< HEAD
       const historyTurns = conversationRef.current
         .filter((m) => m && typeof m.content === 'string' && m.content.trim().length > 0)
         .slice(-6);
@@ -525,6 +535,27 @@ export const ProximityAIProvider: React.FC<{ children: React.ReactNode }> = ({ c
       const destId = dest?.id ?? null;
 
       if (!mountedRef.current || (destId ? activeId !== destId : activeId !== null)) return;
+=======
+      const result = await callGroqChat({
+        messages: [
+          { role: 'system', content: dest ? buildQASystemPrompt(dest) : buildGenericQASystemPrompt() },
+          ...conversationRef.current.slice(-6),
+        ],
+        temperature: 0.7,
+        max_tokens: 180,
+        top_p: 0.9,
+      });
+
+      const reply = result.data.reply?.trim();
+      const destId = dest?.id ?? null;
+
+      if (!mountedRef.current || (destId ? activeId !== destId : activeId !== null)) return;
+      if (!reply) {
+        setNarration("Sorry, I didn't quite get that — can you ask again?");
+        setStatus('paused');
+        return;
+      }
+>>>>>>> origin/main
 
       conversationRef.current.push({ role: 'assistant', content: reply });
       setNarration(reply);
@@ -541,6 +572,7 @@ export const ProximityAIProvider: React.FC<{ children: React.ReactNode }> = ({ c
         },
       });
     } catch (err) {
+<<<<<<< HEAD
       console.warn('ProximityAI: askQuestion fell back to local intelligence:', err);
       const destId = dest?.id ?? null;
       if (!mountedRef.current || (destId ? activeIdRef.current !== destId : activeIdRef.current !== null)) return;
@@ -560,6 +592,13 @@ export const ProximityAIProvider: React.FC<{ children: React.ReactNode }> = ({ c
           setStatus('paused');
         },
       });
+=======
+      console.error('ProximityAI: askQuestion failed', err);
+      const destId = dest?.id ?? null;
+      if (!mountedRef.current || (destId ? activeIdRef.current !== destId : activeIdRef.current !== null)) return;
+      setNarration("Hmm, I'm having trouble hearing myself think. Try again?");
+      setStatus('paused');
+>>>>>>> origin/main
     }
   }, [destination, speak, stopTTS]);
 

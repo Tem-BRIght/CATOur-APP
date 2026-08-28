@@ -64,7 +64,11 @@ export interface Tourist {
   name: string;
   email: string;
   joinedAt: string;
+<<<<<<< HEAD
   status?: 'Joined' | 'Checked-In' | 'Cancelled' | 'Pending' | 'Reviewed';
+=======
+  status?: 'Joined' | 'Checked-In' | 'Cancelled';
+>>>>>>> origin/main
   cancelledAt?: string;
   cancelReason?: string;
   gender?: string;
@@ -602,6 +606,7 @@ export async function cancelJoinedSession(
   if (!trimmedReason) throw new Error('Please provide a valid reason for cancelling this tour.');
 
   await runTransaction(firestore, async (transaction) => {
+<<<<<<< HEAD
     let guideId = '';
     let sessionDate = '';
     let sessionStartTime = '';
@@ -625,12 +630,33 @@ export async function cancelJoinedSession(
     if (!guideId) throw new Error('Tour guide not found');
 
     const guideRef = doc(firestore, 'tourGuides', guideId);
+=======
+    const sessionRef = sessionDoc(sessionId);
+    const sessionSnap = await transaction.get(sessionRef);
+    if (!sessionSnap.exists()) throw new Error('Session not found');
+
+    const session = sessionSnap.data() as TourSession;
+    if (session.status !== 'pending') {
+      throw new Error('This tour can only be cancelled before it starts.');
+    }
+    const tourists = Array.isArray(session.tourists) ? session.tourists : [];
+    const tourist = tourists.find((item) => item.uid === userId);
+    if (!session.touristUids?.includes(userId) || !tourist) {
+      throw new Error('You are not joined to this tour.');
+    }
+    if (session.checkedInUids?.includes(userId) || tourist.status === 'Checked-In') {
+      throw new Error('This tour cannot be cancelled after check-in.');
+    }
+
+    const guideRef = doc(firestore, 'tourGuides', session.guideId);
+>>>>>>> origin/main
     const guideSnap = await transaction.get(guideRef);
     if (!guideSnap.exists()) throw new Error('Tour guide not found');
 
     const slots = Array.isArray(guideSnap.data().availabilitySlots)
       ? [...guideSnap.data().availabilitySlots]
       : [];
+<<<<<<< HEAD
 
     let slotIndex = -1;
     if (session?.startTime) {
@@ -680,6 +706,39 @@ export async function cancelJoinedSession(
         checkedInUids: (session.checkedInUids || []).filter((id) => id !== userId),
       });
     }
+=======
+    const sessionStart = new Date(session.startTime).getTime();
+    const slotIndex = slots.findIndex((slot: any) =>
+      new Date(`${slot.date}T${slot.startTime}:00`).getTime() === sessionStart
+    );
+    if (slotIndex < 0) throw new Error('The assigned tour slot could not be found.');
+
+    const slot = { ...slots[slotIndex] };
+    const previousBookedCount = Number(slot.bookedCount ?? slot.sessionCount ?? 0);
+    const previousSessionCount = Number(slot.sessionCount ?? previousBookedCount);
+    const hadSlotRegistration = (Array.isArray(slot.joinedUserIds) ? slot.joinedUserIds : [])
+      .includes(userId);
+    slot.joinedUserIds = (Array.isArray(slot.joinedUserIds) ? slot.joinedUserIds : [])
+      .filter((id: string) => id !== userId);
+    slot.bookedCount = Math.max(0, previousBookedCount - (hadSlotRegistration ? 1 : 0));
+    slot.sessionCount = Math.max(0, previousSessionCount - (hadSlotRegistration ? 1 : 0));
+    slots[slotIndex] = slot;
+
+    transaction.update(guideRef, { availabilitySlots: slots });
+    transaction.update(sessionRef, {
+      tourists: tourists.map((item) => item.uid === userId
+        ? {
+            ...item,
+            status: 'Cancelled',
+            cancelReason: trimmedReason,
+            cancelledAt: new Date().toISOString(),
+          }
+        : item),
+      touristUids: session.touristUids || [],
+      cancelledUids: arrayUnion(userId),
+      checkedInUids: (session.checkedInUids || []).filter((id) => id !== userId),
+    });
+>>>>>>> origin/main
   });
 }
 
@@ -904,6 +963,7 @@ export function buildJoinedSessionFallbacks(
     if (!Array.isArray(slot.joinedUserIds) || !slot.joinedUserIds.includes(uid)) return;
 
     const fallbackId = `slot:${slot.guideId}:${slot.date}:${slot.startTime}`;
+<<<<<<< HEAD
     const existing: TourSession | undefined = sessionMap.get(fallbackId);
 
     const merged: TourSession = existing
@@ -930,6 +990,26 @@ export function buildJoinedSessionFallbacks(
           tourTypeId: slot.tourTypeId || '',
           tourTypeName: slot.tourTypeName || 'Tour',
         };
+=======
+    const existing = sessionMap.get(fallbackId);
+
+    const merged: TourSession = existing || {
+      id: fallbackId,
+      destinationId: slot.destinationId,
+      destinationName: slot.destinationName,
+      guideId: slot.guideId,
+      guideName: slot.guideName,
+      guidePhotoUrl: slot.guidePhotoUrl,
+      startTime: normalizeSlotIsoValue(slot.date, slot.startTime),
+      endTime: normalizeSlotIsoValue(slot.date, slot.endTime),
+      tourists: [],
+      touristUids: [uid],
+      createdAt: new Date().toISOString(),
+      status: 'pending',
+      tourTypeId: slot.tourTypeId || '',
+      tourTypeName: slot.tourTypeName || 'Tour',
+    };
+>>>>>>> origin/main
 
     if (!existing) {
       sessionMap.set(fallbackId, merged);
@@ -1017,6 +1097,7 @@ export function subscribeSession(
       if (!snap.exists()) { onChange(null); return; }
       const session = { id: snap.id, ...snap.data() } as TourSession;
       await enrichGuideProfile(session);
+<<<<<<< HEAD
 
       const hasTourists = Array.isArray(session.tourists) && session.tourists.length > 0;
       const touristUids = Array.isArray(session.touristUids) ? session.touristUids : [];
@@ -1051,13 +1132,19 @@ export function subscribeSession(
         );
         session.tourists = builtTourists;
       } else if (hasTourists) {
+=======
+      if (Array.isArray(session.tourists)) {
+>>>>>>> origin/main
         const enrichedTourists = await Promise.all(session.tourists.map(async (tourist) => {
           const profile = tourist.uid ? await getSessionProfile(tourist.uid) : null;
           return hydrateTouristProfile(tourist, profile);
         }));
         session.tourists = enrichedTourists;
       }
+<<<<<<< HEAD
 
+=======
+>>>>>>> origin/main
       onChange(session);
     },
     (err) => console.error('[sessionService] subscribeSession error:', err)
@@ -1080,14 +1167,20 @@ export function subscribeUserJoinedSessions(
       String(tourTypeDoc.data().name || tourTypeDoc.data().title || ''),
     ])))
     .catch(() => new Map<string, string>());
+<<<<<<< HEAD
   const guidesPromise = getDocs(collection(firestore, 'tourGuides')).catch(() => null);
 
+=======
+>>>>>>> origin/main
   return onSnapshot(
     sessionsQuery,
     async (snap) => {
       const tourTypeNames = await tourTypeNamesPromise;
+<<<<<<< HEAD
       const guidesSnap = await guidesPromise || await getDocs(collection(firestore, 'tourGuides')).catch(() => null);
 
+=======
+>>>>>>> origin/main
       const sessions = snap.docs
         .map((item) => {
           const session = { id: item.id, ...item.data() } as TourSession;
@@ -1095,6 +1188,7 @@ export function subscribeUserJoinedSessions(
             ...session,
             tourTypeName: session.tourTypeName || tourTypeNames.get(session.tourTypeId || '') || 'Tour',
           }, uid);
+<<<<<<< HEAD
         });
 
       if (guidesSnap) {
@@ -1132,6 +1226,11 @@ export function subscribeUserJoinedSessions(
       } else {
         onChange(sessions.sort((a, b) => new Date(b.startTime || 0).getTime() - new Date(a.startTime || 0).getTime()));
       }
+=======
+        })
+        .sort((a, b) => new Date(b.startTime || 0).getTime() - new Date(a.startTime || 0).getTime());
+      onChange(sessions);
+>>>>>>> origin/main
     },
     (err) => console.error('[sessionService] subscribeUserJoinedSessions error:', err),
   );

@@ -21,7 +21,10 @@
 import { useCallback, useRef } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { TextToSpeech } from '@capacitor-community/text-to-speech';
+<<<<<<< HEAD
 import { stripMarkdown } from '../services/ttsService';
+=======
+>>>>>>> origin/main
 
 export interface SpeakOptions {
   lang?: string;
@@ -37,18 +40,26 @@ export function useTextToSpeech() {
   const lastTextRef = useRef<string>('');
   const lastOptsRef = useRef<SpeakOptions>({});
 
+<<<<<<< HEAD
   const speak = useCallback(async (rawText: string, opts: SpeakOptions = {}) => {
     const text = stripMarkdown(rawText);
     if (!text.trim()) return;
 
     lastTextRef.current = rawText;
+=======
+  const speak = useCallback(async (text: string, opts: SpeakOptions = {}) => {
+    lastTextRef.current = text;
+>>>>>>> origin/main
     lastOptsRef.current = opts;
 
     if (isNative) {
       try {
         console.log('[useTextToSpeech] native speak requested', { text });
         opts.onStart?.();
+<<<<<<< HEAD
         await TextToSpeech.stop().catch(() => {});
+=======
+>>>>>>> origin/main
         await TextToSpeech.speak({
           text,
           lang: opts.lang ?? 'en-US',

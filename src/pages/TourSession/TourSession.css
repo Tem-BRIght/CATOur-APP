@@ -317,6 +317,7 @@
 @keyframes ts-live-pulse {
   0%, 100% { opacity: 1; }
   50%       { opacity: 0.4; }
+<<<<<<< HEAD
 }
 
 /* ── Tourist List ── */
@@ -393,4 +394,6 @@
 .ts-tourist-status.reviewed {
   background: #e0e7ff;
   color: #3730a3;
+=======
+>>>>>>> origin/main
 }

@@ -19,6 +19,10 @@ import {
   getUserProfile,
   UserProfile,
   UserName,
+<<<<<<< HEAD
+=======
+  UserAddress
+>>>>>>> origin/main
 } from '../../../services/userProfileService';
 import { getProfilePicCache, setProfilePicCache } from '../../../utils/profileImageStorage';
 import OtherSelect from '../../../components/OtherSelect';
@@ -42,6 +46,7 @@ function getSelectValue(value: string | undefined, options: string[]) {
 }
 
 
+<<<<<<< HEAD
 function formatAddress(address: any): string {
   if (!address) return '-';
   if (typeof address === 'string') return address.trim() || '-';
@@ -51,6 +56,30 @@ function formatAddress(address: any): string {
     return parts.length ? parts.join(', ') : '-';
   }
   return String(address).trim() || '-';
+=======
+function formatAddress(address: UserAddress | string | undefined): string {
+  if (!address) return '-';
+  if (typeof address === 'string') return address || '-';
+  const parts = [address.brgy, address.city, address.region].filter(Boolean);
+  return parts.length ? parts.join(', ') : '-';
+}
+
+function normalizeAddressValue(address: UserAddress | string | undefined): UserAddress {
+  if (!address) return { brgy: '', city: '', region: '' };
+  if (typeof address === 'string') {
+    const parts = address.split(',').map(part => part.trim()).filter(Boolean);
+    return {
+      brgy: parts[0] || '',
+      city: parts[1] || '',
+      region: parts.slice(2).join(', ') || '',
+    };
+  }
+  return {
+    brgy: address.brgy || '',
+    city: address.city || '',
+    region: address.region || '',
+  };
+>>>>>>> origin/main
 }
 
 const Profile: React.FC = () => {
@@ -90,6 +119,21 @@ const Profile: React.FC = () => {
               console.debug('[Profile] failed to sync emailVerified to Firestore:', err);
             });
           }
+<<<<<<< HEAD
+=======
+          // Sync address cascade selects only when NOT actively editing,
+          // so in-progress edits are not overwritten by the live stream.
+          const normalizedAddress = normalizeAddressValue(profile.address as UserAddress | string | undefined);
+          // If the stored address is already a freeform string, prefer that
+          // for the edit input so we don't lose street details. Otherwise
+          // build a joined string from the normalized object parts.
+          const joinedAddressFromParts = [normalizedAddress.brgy, normalizedAddress.city, normalizedAddress.region]
+            .filter(Boolean)
+            .join(', ');
+          const originalString = typeof profile.address === 'string' && profile.address.trim()
+            ? profile.address.trim()
+            : '';
+>>>>>>> origin/main
         } else {
           setUserProfile(null);
         }
@@ -160,9 +204,20 @@ const Profile: React.FC = () => {
 
   const handleEditProfile = () => {
     if (userProfile) {
+<<<<<<< HEAD
       const initialEdit = typeof userProfile.address === 'string'
         ? userProfile.address.trim()
         : formatAddress(userProfile.address);
+=======
+      const addr = normalizeAddressValue(userProfile.address as UserAddress | string | undefined);
+      const joinedAddress = [addr.brgy, addr.city, addr.region].filter(Boolean).join(', ');
+      // Preserve original string address when available so users edit the
+      // full freeform address they originally entered (street + city, etc.)
+      const originalString = typeof userProfile.address === 'string' && userProfile.address.trim()
+        ? userProfile.address.trim()
+        : '';
+      const initialEdit = originalString || joinedAddress;
+>>>>>>> origin/main
       const savedNationality = userProfile.nationality || '';
       const savedReligion = userProfile.religion || '';
       const nationalityValue = getSelectValue(savedNationality, NATIONALITIES);
@@ -416,7 +471,11 @@ const Profile: React.FC = () => {
                       <IonIcon icon={homeOutline} slot="start" />
                       <IonLabel>
                         <h3>Address</h3>
+<<<<<<< HEAD
                         <p>{formatAddress(userProfile.address)}</p>
+=======
+                        <p>{formatAddress(userProfile.address as UserAddress | string)}</p>
+>>>>>>> origin/main
                       </IonLabel>
                     </IonItem>
 

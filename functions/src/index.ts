@@ -22,9 +22,16 @@ const GROQ_API_ENDPOINT_SOURCE = process.env.GROQ_API_ENDPOINT ? 'env' : 'defaul
 const DEFAULT_MODEL = process.env.GROQ_MODEL?.trim() || 'llama-3.3-70b-versatile';
 const FALLBACK_MODELS = [
   'llama-3.1-8b-instant',
+<<<<<<< HEAD
   'llama-3.2-3b-preview',
   'llama-3.2-1b-preview',
   'qwen-2.5-32b',
+=======
+  'llama3-70b-8192',
+  'llama3-8b-8192',
+  'gemma2-9b-it',
+  'mixtral-8x7b-32768',
+>>>>>>> origin/main
 ];
 const MAX_TOKENS_CAP = 1024;
 const ALLOWED_ROLES = new Set(['system', 'user', 'assistant']);
@@ -217,6 +224,7 @@ export const groqChat = onCall<GroqChatRequest, Promise<GroqChatResponse>>(
         }
 
         const json = await response.json();
+<<<<<<< HEAD
         const choice = json.choices?.[0];
         const reply: string | undefined = choice?.message?.content || choice?.message?.reasoning_content || choice?.text;
         if (!reply?.trim()) {
@@ -228,6 +236,13 @@ export const groqChat = onCall<GroqChatRequest, Promise<GroqChatResponse>>(
           throw new HttpsError('internal', 'AI service returned an empty response.');
         }
         return { reply: reply.trim() };
+=======
+        const reply: string | undefined = json.choices?.[0]?.message?.content;
+        if (!reply?.trim()) {
+          throw new HttpsError('internal', 'AI service returned an empty response.');
+        }
+        return { reply };
+>>>>>>> origin/main
       } catch (err) {
         lastError = err instanceof Error ? err : new Error(String(err));
         if (err instanceof HttpsError && err.code === 'internal') {

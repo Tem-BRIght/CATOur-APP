@@ -285,6 +285,7 @@ export const fetchPopularDestinations = async (): Promise<Destination[]> => {
 export function subscribeRecommendedDestinations(
   onChange: (destinations: Destination[]) => void,
 ): Unsubscribe {
+<<<<<<< HEAD
   // Instant render from cache if available
   const cached = getCachedDestinationsList();
   if (cached && cached.data.length > 0) {
@@ -315,11 +316,70 @@ export function subscribeRecommendedDestinations(
       const fallbackCached = getCachedDestinationsList();
       if (fallbackCached) onChange(fallbackCached.data);
     }
+=======
+  // Try recommended=true first
+  let q = query(col(), where('recommended', '==', true), orderBy('rating', 'desc'), limit(20));
+
+  const unsub = onSnapshot(
+    q,
+    (snap) => {
+      if (!snap.empty) {
+        const data = fromSnapshot(snap).filter(d => (d as any).status !== 'draft');
+        cacheDestinationsList(data); // cache every live update
+        onChange(data);
+        return;
+      }
+      // No recommended docs — fall back to published
+      const fallbackUnsub = onSnapshot(
+        query(col(), where('status', '==', 'published'), orderBy('createdAt', 'desc'), limit(20)),
+        (pubSnap) => {
+          if (!pubSnap.empty) {
+            const data = fromSnapshot(pubSnap);
+            cacheDestinationsList(data);
+            onChange(data);
+          } else {
+            // Last resort: all docs by rating
+            onSnapshot(
+              query(col(), orderBy('rating', 'desc'), limit(10)),
+              (rSnap) => {
+                const data = fromSnapshot(rSnap).filter(d => (d as any).status !== 'draft');
+                cacheDestinationsList(data);
+                onChange(data);
+              },
+              (err) => console.error('[destinationService] subscribeRecommended rating fallback:', err),
+            );
+          }
+        },
+        (err) => console.error('[destinationService] subscribeRecommended published fallback:', err),
+      );
+      // Note: inner fallback unsubscribes are not exposed — they live as long as
+      // the outer listener, which is acceptable for this use-case.
+      void fallbackUnsub;
+    },
+    (err) => {
+      console.warn('[destinationService] subscribeRecommended onSnapshot error:', err?.message);
+      // NEW — offline: serve cache immediately instead of an empty list,
+      // then still attempt the unordered fallback in case connectivity
+      // returns mid-session.
+      const cached = getCachedDestinationsList();
+      if (cached) onChange(cached.data);
+      onSnapshot(
+        query(col(), limit(20)),
+        (snap) => {
+          const data = fromSnapshot(snap).filter(d => (d as any).status !== 'draft');
+          cacheDestinationsList(data);
+          onChange(data);
+        },
+        (e) => console.error('[destinationService] subscribeRecommended unordered fallback:', e),
+      );
+    },
+>>>>>>> origin/main
   );
 
   return unsub;
 }
 
+<<<<<<< HEAD
 export function subscribePopularDestinations(
   onChange: (destinations: Destination[]) => void,
 ): Unsubscribe {
@@ -343,6 +403,66 @@ export function subscribePopularDestinations(
       const fallbackCached = getCachedDestinationsList();
       if (fallbackCached) onChange(fallbackCached.data);
     }
+=======
+/**
+ * subscribePopularDestinations
+ * Streams destinations that can be ranked as popular in real-time.
+ * Home ranks these candidates by visits first, then rating.
+ * Returns an unsubscribe function — call in useEffect cleanup.
+ */
+export function subscribePopularDestinations(
+  onChange: (destinations: Destination[]) => void,
+): Unsubscribe {
+  const unsub = onSnapshot(
+    // Load enough candidates for Home to rank the actual top five. Limiting
+    // this query to featured destinations hides all non-featured places when
+    // only a few destinations have featured=true.
+    query(col(), limit(50)),
+    (snap) => {
+      if (!snap.empty) {
+        const data = fromSnapshot(snap);
+        cacheDestinationsList(data);
+        onChange(data);
+        return;
+      }
+      // Fall back to most-reviewed
+      onSnapshot(
+        query(col(), orderBy('reviewCount', 'desc'), limit(20)),
+        (snap2) => {
+          if (!snap2.empty) {
+            const data = fromSnapshot(snap2);
+            cacheDestinationsList(data);
+            onChange(data);
+          } else {
+            onSnapshot(
+              query(col(), orderBy('rating', 'desc'), limit(20)),
+              (snap3) => {
+                const data = fromSnapshot(snap3);
+                cacheDestinationsList(data);
+                onChange(data);
+              },
+              (err) => console.error('[destinationService] subscribePopular rating fallback:', err),
+            );
+          }
+        },
+        (err) => console.error('[destinationService] subscribePopular reviewCount fallback:', err),
+      );
+    },
+    (err) => {
+      console.warn('[destinationService] subscribePopular onSnapshot error:', err?.message);
+      const cached = getCachedDestinationsList();
+      if (cached) onChange(cached.data);
+      onSnapshot(
+        query(col(), limit(20)),
+        (snap) => {
+          const data = fromSnapshot(snap);
+          cacheDestinationsList(data);
+          onChange(data);
+        },
+        (e) => console.error('[destinationService] subscribePopular unordered fallback:', e),
+      );
+    },
+>>>>>>> origin/main
   );
 
   return unsub;

@@ -99,7 +99,11 @@ interface UserProfile {
   age?: number | string;
   birthdate?: string | number;
   nationality?: string;
+<<<<<<< HEAD
   address?: string;
+=======
+  address?: string | { full?: string; region?: string; city?: string; district?: string; brgy?: string };
+>>>>>>> origin/main
 }
 
 const Profile: React.FC = () => {
@@ -140,9 +144,12 @@ const Profile: React.FC = () => {
             if (!data.img && data.photoUrl) data.img = data.photoUrl;
           }
         }
+<<<<<<< HEAD
         if (data.address && typeof data.address !== 'string') {
           data.address = (data.address as any).full || '';
         }
+=======
+>>>>>>> origin/main
         setProfile(data);
       } catch (err) {
         console.error('Failed to load profile:', err);
@@ -182,7 +189,13 @@ const Profile: React.FC = () => {
   const displayNationality = profile?.nationality || '';
   const displayAddress = typeof profile?.address === 'string'
     ? profile.address
+<<<<<<< HEAD
     : ((profile?.address as any)?.full || '');
+=======
+    : profile?.address?.full || [profile?.address?.region, profile?.address?.city, profile?.address?.district, profile?.address?.brgy]
+      .filter(Boolean)
+      .join(', ');
+>>>>>>> origin/main
 
   const openEdit = () => {
     setFullName(displayName);
@@ -286,7 +299,14 @@ const Profile: React.FC = () => {
           age: ageValue,
           birthdate: birthdateValue,
           nationality: nationalityValue,
+<<<<<<< HEAD
           address: addressValue,
+=======
+          address: {
+            ...(typeof profile?.address === 'object' ? profile.address : {}),
+            full: addressValue,
+          },
+>>>>>>> origin/main
           img: imgValue,
         },
         { merge: true }
@@ -308,6 +328,7 @@ const Profile: React.FC = () => {
         { merge: true }
       );
 
+<<<<<<< HEAD
       await setDoc(
         guideDocRef,
         {
@@ -324,6 +345,8 @@ const Profile: React.FC = () => {
         { merge: true }
       );
 
+=======
+>>>>>>> origin/main
       setProfile((prev) =>
         prev
           ? {
