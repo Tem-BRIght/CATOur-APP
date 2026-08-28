@@ -12,11 +12,10 @@ import {
   location, star, heart, heartOutline,
   cloudOfflineOutline,
 } from 'ionicons/icons';
-import { collection, doc, limit, onSnapshot, orderBy, query } from 'firebase/firestore';
+import { collection, doc, limit, onSnapshot, query } from 'firebase/firestore';
 import { firestore } from '../../firebase';
 import { useAuth } from '../../context/AuthContext';
 import {
-  subscribeRecommendedDestinations,
   subscribePopularDestinations,
 } from '../../services/destinationService';
 import { AppNotification, subscribeNotifications } from '../../services/notificationsService';
@@ -91,23 +90,21 @@ const Home: React.FC = () => {
   }, [authLoading, isAuthenticated, user?.uid]);
 
   // ── real-time destinations ───────────────────────────────────────────────
-  // Both sections subscribe independently so either can refresh without
-  // affecting the other.
+  // Both sections use the same collection, so derive them from one listener.
   useEffect(() => {
     if (authLoading || !isAuthenticated) return;
 
-    const unsubRec = subscribeRecommendedDestinations((data) => {
-      setRecommended(data ?? []);
+    const unsubscribe = subscribePopularDestinations((data) => {
+      const destinations = data ?? [];
+      setPopular(destinations);
+      setRecommended(
+        destinations
+          .sort((a, b) => Number((b as any).recommended) - Number((a as any).recommended) || (b.rating || 0) - (a.rating || 0))
+          .slice(0, 20),
+      );
     });
 
-    const unsubPop = subscribePopularDestinations((data) => {
-      setPopular(data ?? []);
-    });
-
-    return () => {
-      unsubRec();
-      unsubPop();
-    };
+    return () => unsubscribe();
   }, [authLoading, isAuthenticated]);
 
   // ── real-time visit ranks ────────────────────────────────────────────────
@@ -117,7 +114,7 @@ const Home: React.FC = () => {
     if (authLoading || !isAuthenticated) return;
 
     const unsubscribe = onSnapshot(
-      query(collection(firestore, 'visits'), orderBy('createdAt', 'desc'), limit(500)),
+      query(collection(firestore, 'visits'), limit(500)),
       (snap) => {
         const countMap = new Map<string, number>();
         snap.forEach(d => {

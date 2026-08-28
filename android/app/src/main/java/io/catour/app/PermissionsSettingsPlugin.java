@@ -9,12 +9,35 @@ import android.provider.Settings;
 import androidx.core.content.ContextCompat;
 
 import com.getcapacitor.JSObject;
+import com.getcapacitor.PermissionState;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
+import com.getcapacitor.annotation.Permission;
+import com.getcapacitor.annotation.PermissionCallback;
 
-@CapacitorPlugin(name = "PermissionsSettings")
+@CapacitorPlugin(
+    name = "PermissionsSettings",
+    permissions = {
+        @Permission(
+            alias = "camera",
+            strings = { Manifest.permission.CAMERA }
+        ),
+        @Permission(
+            alias = "location",
+            strings = { Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION }
+        ),
+        @Permission(
+            alias = "microphone",
+            strings = { Manifest.permission.RECORD_AUDIO }
+        ),
+        @Permission(
+            alias = "notifications",
+            strings = { Manifest.permission.POST_NOTIFICATIONS }
+        )
+    }
+)
 public class PermissionsSettingsPlugin extends Plugin {
 
     @PluginMethod
@@ -45,18 +68,34 @@ public class PermissionsSettingsPlugin extends Plugin {
         
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             ret.put("notifications", isGranted(Manifest.permission.POST_NOTIFICATIONS));
-            ret.put("photos", isGranted(Manifest.permission.READ_MEDIA_IMAGES));
         } else {
-            ret.put("notifications", true);
-            ret.put("photos", isGranted(Manifest.permission.READ_EXTERNAL_STORAGE));
-        }
-
-        // Special check for Android 14+ Partial Access
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-            ret.put("limitedPhotos", isGranted(Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED));
+            // Notifications are handled differently on older Android versions
+            ret.put("notifications", true); 
         }
         
         call.resolve(ret);
+    }
+
+    @PluginMethod
+    public void requestPermission(PluginCall call) {
+        String alias = call.getString("alias");
+        if (alias == null) {
+            call.reject("Alias is required (camera, location, microphone, or notifications)");
+            return;
+        }
+
+        // Special handling for notifications on older versions
+        if (alias.equals("notifications") && Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+            open(call);
+            return;
+        }
+
+        requestPermissionForAlias(alias, call, "permissionCallback");
+    }
+
+    @PermissionCallback
+    private void permissionCallback(PluginCall call) {
+        getStatus(call);
     }
 
     private boolean isGranted(String permission) {
