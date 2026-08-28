@@ -27,11 +27,7 @@ import { useProximityAIOptional } from '../../../context/Proximityaicontext';
 import { auth, firestore } from '../../../firebase';
 import { Destination } from '../../../types';
 import { createNotification, notifyVisitRecorded } from '../../../services/notificationsService';
-<<<<<<< HEAD
-import { addTouristToSession, checkInTouristToSession } from '../../../services/sessionService';
-=======
 import { checkInTouristToSession } from '../../../services/sessionService';
->>>>>>> origin/main
 
 import './Scan.css';
 
@@ -265,35 +261,15 @@ const Scan: React.FC = () => {
           return;
         }
 
-<<<<<<< HEAD
-        // Scanning the guide's QR IS how a tourist joins this session — the
-        // session doc is created empty (no touristUids) by GenerateQR.tsx,
-        // so checkInTouristToSession() alone would always reject with
-        // "You are not registered for this tour session." for every QR
-        // scanner. Register the tourist into the shared roster first (a
-        // no-op if they already joined via "Check Availability" earlier),
-        // then flip them to Checked-In — one QR code per session, reused by
-        // every tourist who scans it, no matter when they scan relative to
-        // the guide's slot start/end time.
-        const profile = userDoc.exists() ? (userDoc.data() as any) : null;
-        const displayName = profile?.name
-          ? `${profile.name.firstname || ''} ${profile.name.surname || ''}`.trim()
-          : (user.displayName || '');
-
-        await addTouristToSession(sessionId, {
-          uid: user.uid,
-          name: displayName || 'Tourist',
-          email: profile?.email || user.email || '',
-          joinedAt: new Date().toISOString(),
-        });
-=======
->>>>>>> origin/main
+        // The QR confirms attendance only. Registration must already exist
+        // from the /tour join flow; an unregistered scan stays on this page.
         await checkInTouristToSession(sessionId, user.uid);
         await createNotification({
           userId: user.uid,
-          type: 'location',
+          type: 'checked_in',
           title: 'Attendance confirmed',
           message: `Your attendance is confirmed for ${sessionData.destinationName || 'this tour'}.`,
+          sessionId,
         });
       } catch (err: any) {
         console.warn('[Scan] session join failed:', err);

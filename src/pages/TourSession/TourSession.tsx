@@ -11,7 +11,6 @@ import {
   IonSpinner,
   IonIcon,
   IonButton,
-<<<<<<< HEAD
   IonList,
   IonItem,
   IonLabel,
@@ -19,10 +18,6 @@ import {
   IonImg,
 } from '@ionic/react';
 import { personOutline, calendarOutline, timeOutline, mapOutline, checkmarkCircle, navigateCircleOutline, briefcaseOutline, locationOutline, peopleOutline } from 'ionicons/icons';
-=======
-} from '@ionic/react';
-import { personOutline, calendarOutline, timeOutline, mapOutline, checkmarkCircle, navigateCircleOutline, briefcaseOutline, locationOutline } from 'ionicons/icons';
->>>>>>> origin/main
 import { useAuth } from '../../context/AuthContext';
 import { getSession, subscribeSession } from '../../services/sessionService';
 import type { TourSession } from '../../services/sessionService';
@@ -466,7 +461,6 @@ const TourSession: React.FC = () => {
           )}
         </div>
 
-<<<<<<< HEAD
         {/* Tourist List */}
         {Array.isArray(session.tourists) && session.tourists.length > 0 && (
           <div className="ts-section">
@@ -497,9 +491,6 @@ const TourSession: React.FC = () => {
             </IonList>
           </div>
         )}
-
-=======
->>>>>>> origin/main
       </IonContent>
     </IonPage>
   );

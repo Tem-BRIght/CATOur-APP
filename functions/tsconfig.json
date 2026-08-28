@@ -6,11 +6,7 @@
     "noImplicitReturns": true,
     "noUnusedLocals": true,
     "outDir": "lib",
-<<<<<<< HEAD
     "rootDir": "src",
-=======
-    
->>>>>>> origin/main
     "sourceMap": true,
     "strict": true,
     "target": "es2017"
@@ -19,8 +15,4 @@
   "include": [
     "src"
   ]
-<<<<<<< HEAD
 }
-=======
-}
->>>>>>> origin/main

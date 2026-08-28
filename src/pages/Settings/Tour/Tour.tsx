@@ -37,28 +37,16 @@ import {
 } from 'ionicons/icons';
 import { useAuth } from '../../../context/AuthContext';
 import {
-<<<<<<< HEAD
   getTourTypesWithSchedules,
   getUpcomingSlotsForTourType,
   joinTour,
   checkTourBookingConflict,
-=======
-  checkTourBookingConflict,
-  getTourTypesWithSchedules,
-  getUpcomingSlotsForTourType,
-  hasTourTypeConflict,
-  joinTour,
->>>>>>> origin/main
   TourTypeWithSchedules,
   UpcomingSlotGroup,
 } from '../../../services/tourScheduleService';
 import { cancelJoinedSession, getUserJoinedSessions, subscribeUserJoinedSessions } from '../../../services/sessionService';
 import type { TourSession } from '../../../services/sessionService';
-<<<<<<< HEAD
 import { getFeedback, GuideFeedbackDoc } from '../../../services/feedbackService';
-=======
-import { getFeedback } from '../../../services/feedbackService';
->>>>>>> origin/main
 import { firestore } from '../../../firebase';
 import './Tour.css';
 
@@ -188,15 +176,7 @@ const TourPage: React.FC = () => {
   const [upcomingLoading, setUpcomingLoading] = useState(false);
   const [feedbackViewer, setFeedbackViewer] = useState<{
     session: TourSession;
-<<<<<<< HEAD
     feedback: GuideFeedbackDoc | null;
-=======
-    feedback: {
-      rating?: number;
-      categoryRatings?: Record<string, number>;
-      comment?: string;
-    } | null;
->>>>>>> origin/main
     places: string[];
   } | null>(null);
   const [feedbackLoading, setFeedbackLoading] = useState(false);
@@ -299,13 +279,9 @@ const TourPage: React.FC = () => {
         name: user.displayName || 'Tourist',
         email: user.email || '',
       });
-<<<<<<< HEAD
       setToastMsg('You joined the tour! Check your joined tour below.');
       setActiveSlotsTypeId(null);
       setSelectedSegment('history');
-=======
-      setToastMsg('You joined the tour!');
->>>>>>> origin/main
       await loadData();
       void loadJoinedSessions();
       if (activeSlotsTypeId) {
@@ -323,7 +299,6 @@ const TourPage: React.FC = () => {
   const handleCancelJoinedSession = async (session: TourSession) => {
     if (!user?.uid) return;
     if (session.status === 'Cancelled') {
-<<<<<<< HEAD
       setToastMsg('This session has already been cancelled.');
       return;
     }
@@ -332,15 +307,6 @@ const TourPage: React.FC = () => {
       return;
     }
 
-=======
-      setToastMsg('This tour is already cancelled.');
-      return;
-    }
-    if (session.status !== 'pending') {
-      setToastMsg('This tour can only be cancelled before it starts.');
-      return;
-    }
->>>>>>> origin/main
     const reason = window.prompt('Enter a valid reason for cancelling this joined tour:', '');
     if (reason === null) return;
     if (!reason.trim()) {
@@ -353,7 +319,6 @@ const TourPage: React.FC = () => {
       setJoinedSessions((current) => current.map((item) => item.id === session.id
         ? { ...item, status: 'Cancelled', cancelReason: reason.trim() }
         : item));
-<<<<<<< HEAD
       setToastMsg('Joined tour cancelled. A slot has been freed up.');
       await loadData();
       if (activeSlotsTypeId) {
@@ -361,29 +326,11 @@ const TourPage: React.FC = () => {
           .then(setUpcomingGroups)
           .catch((err) => console.error('Failed to refresh upcoming tours:', err));
       }
-=======
-      setToastMsg('Joined tour cancelled.');
->>>>>>> origin/main
     } catch (err: any) {
       setToastMsg(err.message || 'Could not cancel this tour.');
     }
   };
 
-<<<<<<< HEAD
-=======
-  const handleViewJoinedSession = (session: TourSession) => {
-    if (!session.id || session.id.startsWith('slot:')) {
-      setToastMsg('This session is still syncing. Please refresh and try again.');
-      return;
-    }
-    if (!user?.uid || !session.checkedInUids?.includes(user.uid)) {
-      setToastMsg("Scan the guide's QR code to check in before viewing the session.");
-      return;
-    }
-    router.push(`/tour-session/${session.id}`, 'forward');
-  };
-
->>>>>>> origin/main
   const handleViewFeedback = async (session: TourSession) => {
     if (!user?.uid) return;
     setFeedbackLoading(true);
@@ -411,20 +358,7 @@ const TourPage: React.FC = () => {
       }
 
       if (places.length === 0 && session.destinationName) places = [session.destinationName];
-<<<<<<< HEAD
       setFeedbackViewer({ session, feedback, places });
-=======
-      const feedbackSummary = feedback
-        ? {
-            rating: typeof feedback.rating === 'number' ? feedback.rating : undefined,
-            categoryRatings: feedback.categoryRatings && typeof feedback.categoryRatings === 'object'
-              ? feedback.categoryRatings as Record<string, number>
-              : undefined,
-            comment: typeof feedback.comment === 'string' ? feedback.comment : undefined,
-          }
-        : null;
-      setFeedbackViewer({ session, feedback: feedbackSummary, places });
->>>>>>> origin/main
       if (!feedback) setToastMsg('You have not submitted feedback for this tour yet.');
     } catch (err) {
       console.error('Failed to load your feedback:', err);
@@ -607,18 +541,13 @@ const TourPage: React.FC = () => {
                     const isCancelled = s.status === 'Cancelled';
                     const isEnded = s.status === 'ended';
                     const isActive = s.status === 'active';
-<<<<<<< HEAD
                     const isCheckedIn = !!(user?.uid && s.checkedInUids?.includes(user.uid));
-=======
-                  const isCheckedIn = !!user?.uid && !!s.checkedInUids?.includes(user.uid);
->>>>>>> origin/main
                     const dotClass = isCancelled
                       ? 'ht-dot--cancelled'
                       : isEnded ? 'ht-dot--completed' : 'ht-dot--confirmed';
                     const pillClass = isCancelled
                       ? 'ht-status-pill--cancelled'
                       : isEnded ? 'ht-status-pill--completed' : 'ht-status-pill--confirmed';
-<<<<<<< HEAD
                     const pillLabel = isCancelled
                       ? 'Cancelled'
                       : isEnded
@@ -626,9 +555,6 @@ const TourPage: React.FC = () => {
                       : isCheckedIn
                       ? (isActive ? 'Ongoing' : 'Checked-In')
                       : 'Reserved';
-=======
-                    const pillLabel = isCancelled ? 'Cancelled' : isEnded ? 'Completed' : isActive ? 'Ongoing' : 'Joined';
->>>>>>> origin/main
                     const isLast = index === joinedSessions.length - 1;
 
                   return (
@@ -654,7 +580,6 @@ const TourPage: React.FC = () => {
                           </p>
                         )}
 
-<<<<<<< HEAD
                         {/* Tap to reopen the same tour session view if checked in */}
                         <div
                           className="ht-dest-row"
@@ -665,13 +590,6 @@ const TourPage: React.FC = () => {
                               setToastMsg('Please scan the Tour Guide’s QR code to check in and access the live session.');
                             }
                           }}
-=======
-                        {/* Tap to reopen the same tour session view the tourist
-                          would land on by scanning the QR again. */}
-                        <div
-                          className={`ht-dest-row ${isCheckedIn ? '' : 'ht-dest-row--locked'}`}
-                          onClick={() => isCheckedIn && handleViewJoinedSession(s)}
->>>>>>> origin/main
                         >
                           <div className="ht-dest-info">
                             <div className="ht-field-label">Type of Tour</div>
@@ -680,10 +598,7 @@ const TourPage: React.FC = () => {
                               <IonIcon icon={timeOutline} /> Duration: {formatSessionDuration(s)}
                             </div>
                           </div>
-<<<<<<< HEAD
                           <IonIcon icon={arrowForwardOutline} className="ht-arrow" />
-=======
->>>>>>> origin/main
                         </div>
 
                         <div className="ht-meta-row">
@@ -731,11 +646,7 @@ const TourPage: React.FC = () => {
                               View Session
                             </IonButton>
                           )}
-<<<<<<< HEAD
                           {isEnded && isCheckedIn && (
-=======
-                          {isEnded && (
->>>>>>> origin/main
                             <IonButton
                               fill="clear"
                               size="small"
@@ -749,7 +660,6 @@ const TourPage: React.FC = () => {
                               View Feedback
                             </IonButton>
                           )}
-<<<<<<< HEAD
                           {!isEnded && !isCancelled && !isCheckedIn && (
                             <IonButton
                               fill="clear"
@@ -763,19 +673,6 @@ const TourPage: React.FC = () => {
                               Cancel Join
                             </IonButton>
                           )}
-=======
-                          <IonButton
-                            fill="clear"
-                            size="small"
-                            className="ht-action-btn ht-action-btn--cancel"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              void handleCancelJoinedSession(s);
-                            }}
-                          >
-                            Cancel Join
-                          </IonButton>
->>>>>>> origin/main
                         </div>
                       </div>
                     </div>
@@ -818,55 +715,32 @@ const TourPage: React.FC = () => {
                   const available = slot.maxSpots - slot.bookedCount;
                   const full = available <= 0;
                   const isJoined = slot.joinedUserIds.includes(user?.uid || '');
-<<<<<<< HEAD
                   // CHANGED — this is the actual lockout: once this slot's
                   // start time has passed (same day), it can no longer be
                   // joined, even though the day itself hasn't changed yet.
                   const expired = isSlotTimeExpired(slot.date, slot.startTime);
-=======
->>>>>>> origin/main
                   const conflict = checkTourBookingConflict(joinedSessions, {
                     tourTypeId: activeType.id,
                     date: slot.date,
                     startTime: slot.startTime,
                     endTime: slot.endTime,
                   }, user?.uid);
-<<<<<<< HEAD
                   const hasConflict = conflict.hasConflict && !isJoined;
-=======
-                  const hasConflict = !isJoined && conflict.hasConflict;
-                  // CHANGED — this is the actual lockout: once this slot's
-                  // start time has passed (same day), it can no longer be
-                  // joined, even though the day itself hasn't changed yet.
-                  const expired = isSlotTimeExpired(slot.date, slot.startTime);
->>>>>>> origin/main
                   const key = `${slot.guideId}-${slot.rawIndex}`;
                   const disabled = full || isJoined || expired || hasConflict || joining === key;
                   const pct = slot.maxSpots > 0 ? (slot.bookedCount / slot.maxSpots) * 100 : 0;
 
                   let statusText = `${available} spot${available !== 1 ? 's' : ''} left`;
                   if (isJoined) statusText = 'You joined';
-<<<<<<< HEAD
                   else if (hasConflict) statusText = conflict.type === 'same_tour_type_same_day' ? '1 tour/day limit' : 'Time conflict';
                   else if (expired) statusText = 'Time has passed';
                   else if (full) statusText = 'Full';
                   else if (slot.date !== getLocalDateKey()) statusText = 'Available';
-=======
-                  else if (hasConflict && conflict.type === 'same_tour_type_same_day') statusText = '1 per day limit';
-                  else if (hasConflict && conflict.type === 'time_overlap') statusText = 'Time conflict';
-                  else if (expired) statusText = 'Time has passed';
-                  else if (full) statusText = 'Full';
->>>>>>> origin/main
 
                   let buttonContent: React.ReactNode = 'Join';
                   if (joining === key) buttonContent = <IonSpinner name="dots" />;
                   else if (isJoined) buttonContent = '✓ Joined';
-<<<<<<< HEAD
                   else if (hasConflict) buttonContent = 'Conflict';
-=======
-                  else if (hasConflict && conflict.type === 'same_tour_type_same_day') buttonContent = 'Joined (Day)';
-                  else if (hasConflict && conflict.type === 'time_overlap') buttonContent = 'Time Conflict';
->>>>>>> origin/main
                   else if (expired) buttonContent = 'Expired';
                   else if (full) buttonContent = 'Full';
 
@@ -909,11 +783,7 @@ const TourPage: React.FC = () => {
                         </span>
                         <div className="slot-row-track">
                           <div
-<<<<<<< HEAD
                             className={`slot-row-fill ${full || "" ? 'slot-row-fill--muted' : ''}`}
-=======
-                            className={`slot-row-fill ${full || expired ? 'slot-row-fill--muted' : ''}`}
->>>>>>> origin/main
                             style={{ width: `${pct}%` }}
                           />
                         </div>
@@ -956,41 +826,23 @@ const TourPage: React.FC = () => {
                           const isJoined = slot.joinedUserIds.includes(user?.uid || '');
                           const conflict = checkTourBookingConflict(joinedSessions, {
                             tourTypeId: activeType.id,
-<<<<<<< HEAD
                             date: group.date,
                             startTime: slot.startTime,
                             endTime: slot.endTime,
                           }, user?.uid);
                           const hasConflict = conflict.hasConflict && !isJoined;
-=======
-                            date: slot.date,
-                            startTime: slot.startTime,
-                            endTime: slot.endTime,
-                          }, user?.uid);
-                          const hasConflict = !isJoined && conflict.hasConflict;
->>>>>>> origin/main
                           const key = `${slot.guideId}-${slot.rawIndex}`;
                           const disabled = full || isJoined || hasConflict || joining === key;
 
                           let statusText = `${available} spot${available !== 1 ? 's' : ''} left`;
                           if (isJoined) statusText = 'You joined';
-<<<<<<< HEAD
                           else if (hasConflict) statusText = conflict.type === 'same_tour_type_same_day' ? '1 tour/day limit' : 'Time conflict';
-=======
-                          else if (hasConflict && conflict.type === 'same_tour_type_same_day') statusText = '1 per day limit';
-                          else if (hasConflict && conflict.type === 'time_overlap') statusText = 'Time conflict';
->>>>>>> origin/main
                           else if (full) statusText = 'Full';
 
                           let buttonContent: React.ReactNode = 'Join';
                           if (joining === key) buttonContent = <IonSpinner name="dots" />;
                           else if (isJoined) buttonContent = '✓ Joined';
-<<<<<<< HEAD
                           else if (hasConflict) buttonContent = 'Conflict';
-=======
-                          else if (hasConflict && conflict.type === 'same_tour_type_same_day') buttonContent = 'Joined (Day)';
-                          else if (hasConflict && conflict.type === 'time_overlap') buttonContent = 'Time Conflict';
->>>>>>> origin/main
                           else if (full) buttonContent = 'Full';
 
                           const pct = slot.maxSpots > 0 ? (slot.bookedCount / slot.maxSpots) * 100 : 0;
@@ -1126,7 +978,6 @@ const TourPage: React.FC = () => {
                       ['Friendliness', 'friendliness'],
                       ['Punctuality', 'punctuality'],
                       ['Communication', 'communication'],
-<<<<<<< HEAD
                     ].map(([label, key]) => {
                       const ratingVal = (feedbackViewer.feedback?.categoryRatings as Record<string, number | undefined> | undefined)?.[key];
                       return (
@@ -1136,14 +987,6 @@ const TourPage: React.FC = () => {
                         </div>
                       );
                     })}
-=======
-                    ].map(([label, key]) => (
-                      <div className="feedback-viewer-category" key={key}>
-                        <span>{label}</span>
-                        <strong>{feedbackViewer.feedback?.categoryRatings?.[key] || '—'}<small>/5</small></strong>
-                      </div>
-                    ))}
->>>>>>> origin/main
                   </div>
                 </section>
 

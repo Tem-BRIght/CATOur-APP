@@ -1,8 +1,5 @@
 import React, { useState } from 'react';
-<<<<<<< HEAD
 import { test, expect } from 'vitest';
-=======
->>>>>>> origin/main
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import App from './App';
@@ -41,10 +38,7 @@ test('keeps anonymous toggle stable while editing and rerendering', async () => 
             anonymous: true,
             allowVenueReply: true,
           }}
-<<<<<<< HEAD
-=======
           key={tick}
->>>>>>> origin/main
         />
       </>
     );

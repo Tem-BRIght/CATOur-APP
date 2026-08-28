@@ -45,7 +45,7 @@ vi.mock('./userProfileService', () => ({
 import { getUserProfile } from './userProfileService';
 
 describe('tour booking conflict validation', () => {
-  it('blocks same tour type on the same date (1 tour type per day rule)', () => {
+  it('allows the same tour type on the same date when times do not overlap', () => {
     const existing = [
       {
         status: 'pending',
@@ -64,8 +64,7 @@ describe('tour booking conflict validation', () => {
       endTime: '16:00',
     });
 
-    expect(result.hasConflict).toBe(true);
-    expect(result.type).toBe('same_tour_type_same_day');
+    expect(result.hasConflict).toBe(false);
   });
 
   it('allows same tour type on a different date', () => {
@@ -167,9 +166,9 @@ describe('tour booking conflict validation', () => {
           status: 'pending',
           tourTypeId: 'food',
           tourTypeName: 'Food Tour',
-          date: '2026-08-28',
-          startTime: '2026-08-28T09:00:00.000Z',
-          endTime: '2026-08-28T11:00:00.000Z',
+          date: '2099-08-28',
+          startTime: '2099-08-28T10:00:00',
+          endTime: '2099-08-28T12:00:00',
         }),
       }],
     });
@@ -179,14 +178,9 @@ describe('tour booking conflict validation', () => {
         exists: () => true,
         data: () => ({
           availabilitySlots: [{
-            date: '2026-08-28',
-<<<<<<< HEAD
-            startTime: '23:00',
-            endTime: '23:59',
-=======
+            date: '2099-08-28',
             startTime: '10:00',
             endTime: '12:00',
->>>>>>> origin/main
             maxSpots: 10,
             bookedCount: 0,
             joinedUserIds: [],
@@ -202,7 +196,7 @@ describe('tour booking conflict validation', () => {
     await expect(joinTour('tourist-1', 'guide-1', 0, 'food', 'Food Tour', {
       name: 'Tourist One',
       email: 'one@example.com',
-    })).rejects.toThrow(/tour type per day|scheduling conflict/);
+    })).rejects.toThrow(/tour type per day|scheduling conflict|conflicts with another tour/);
     expect(transaction.update).not.toHaveBeenCalled();
   });
 
@@ -425,6 +419,7 @@ describe('tour booking conflict validation', () => {
     );
   });
 });
+
 
 describe('session lifecycle logging', () => {
   beforeEach(() => {

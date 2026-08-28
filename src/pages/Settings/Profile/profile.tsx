@@ -19,10 +19,7 @@ import {
   getUserProfile,
   UserProfile,
   UserName,
-<<<<<<< HEAD
-=======
   UserAddress
->>>>>>> origin/main
 } from '../../../services/userProfileService';
 import { getProfilePicCache, setProfilePicCache } from '../../../utils/profileImageStorage';
 import OtherSelect from '../../../components/OtherSelect';
@@ -46,8 +43,7 @@ function getSelectValue(value: string | undefined, options: string[]) {
 }
 
 
-<<<<<<< HEAD
-function formatAddress(address: any): string {
+function formatAddress(address: (UserAddress & { full?: string; barangay?: string; district?: string }) | string | undefined): string {
   if (!address) return '-';
   if (typeof address === 'string') return address.trim() || '-';
   if (typeof address === 'object') {
@@ -56,12 +52,6 @@ function formatAddress(address: any): string {
     return parts.length ? parts.join(', ') : '-';
   }
   return String(address).trim() || '-';
-=======
-function formatAddress(address: UserAddress | string | undefined): string {
-  if (!address) return '-';
-  if (typeof address === 'string') return address || '-';
-  const parts = [address.brgy, address.city, address.region].filter(Boolean);
-  return parts.length ? parts.join(', ') : '-';
 }
 
 function normalizeAddressValue(address: UserAddress | string | undefined): UserAddress {
@@ -79,7 +69,6 @@ function normalizeAddressValue(address: UserAddress | string | undefined): UserA
     city: address.city || '',
     region: address.region || '',
   };
->>>>>>> origin/main
 }
 
 const Profile: React.FC = () => {
@@ -119,8 +108,6 @@ const Profile: React.FC = () => {
               console.debug('[Profile] failed to sync emailVerified to Firestore:', err);
             });
           }
-<<<<<<< HEAD
-=======
           // Sync address cascade selects only when NOT actively editing,
           // so in-progress edits are not overwritten by the live stream.
           const normalizedAddress = normalizeAddressValue(profile.address as UserAddress | string | undefined);
@@ -133,7 +120,6 @@ const Profile: React.FC = () => {
           const originalString = typeof profile.address === 'string' && profile.address.trim()
             ? profile.address.trim()
             : '';
->>>>>>> origin/main
         } else {
           setUserProfile(null);
         }
@@ -204,11 +190,6 @@ const Profile: React.FC = () => {
 
   const handleEditProfile = () => {
     if (userProfile) {
-<<<<<<< HEAD
-      const initialEdit = typeof userProfile.address === 'string'
-        ? userProfile.address.trim()
-        : formatAddress(userProfile.address);
-=======
       const addr = normalizeAddressValue(userProfile.address as UserAddress | string | undefined);
       const joinedAddress = [addr.brgy, addr.city, addr.region].filter(Boolean).join(', ');
       // Preserve original string address when available so users edit the
@@ -217,7 +198,6 @@ const Profile: React.FC = () => {
         ? userProfile.address.trim()
         : '';
       const initialEdit = originalString || joinedAddress;
->>>>>>> origin/main
       const savedNationality = userProfile.nationality || '';
       const savedReligion = userProfile.religion || '';
       const nationalityValue = getSelectValue(savedNationality, NATIONALITIES);
@@ -471,11 +451,7 @@ const Profile: React.FC = () => {
                       <IonIcon icon={homeOutline} slot="start" />
                       <IonLabel>
                         <h3>Address</h3>
-<<<<<<< HEAD
-                        <p>{formatAddress(userProfile.address)}</p>
-=======
                         <p>{formatAddress(userProfile.address as UserAddress | string)}</p>
->>>>>>> origin/main
                       </IonLabel>
                     </IonItem>
 

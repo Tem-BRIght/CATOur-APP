@@ -179,17 +179,8 @@ export function checkTourBookingConflict(
       sessionEndMs = sessionStartMs + 60 * 60 * 1000;
     }
 
-    // 1. Same tour type on the same date (Rule: 1 tour type per day to every tourist)
-    if (session.tourTypeId === target.tourTypeId && sessionDate === target.date) {
-      return {
-        hasConflict: true,
-        type: 'same_tour_type_same_day',
-        message: 'You have already joined this tour type for this date. Tourists can join only one session per tour type per day.',
-        conflictingTourName: session.tourTypeName,
-      };
-    }
-
-    // 2. Overlapping date and time on the same date (Rule: conflict on different tour type but same date and time)
+    // A tourist cannot join overlapping active registrations, regardless of
+    // tour type. A different session of the same type is valid at another time.
     if (sessionDate === target.date && sessionStartMs > 0 && sessionEndMs > 0 && !Number.isNaN(targetStart) && !Number.isNaN(targetEnd)) {
       const isOverlap = targetStart < sessionEndMs && targetEnd > sessionStartMs;
       if (isOverlap) {
@@ -264,11 +255,7 @@ export async function getTourTypesWithSchedules(): Promise<TourTypeWithSchedules
 
   const result: TourTypeWithSchedules[] = [];
 
-<<<<<<< HEAD
-  // 3. For each tour type, find matching guides with an available slot
-=======
-  // 3. For each tour type, find matching guides with a slot assigned TODAY
->>>>>>> origin/main
+  // 3. For each tour type, find matching guides with an available slot.
   for (const [typeId, typeInfo] of tourTypesMap) {
     const guides: TourGuideSchedule[] = [];
 
@@ -276,26 +263,6 @@ export async function getTourTypesWithSchedules(): Promise<TourTypeWithSchedules
       const guideData = guideDoc.data();
       const tourTypeIds = resolveGuideTourTypeIds(guideData, tourTypesMap);
 
-<<<<<<< HEAD
-      if (!tourTypeIds.includes(typeId)) continue;
-
-      const rawSlots: any[] = guideData.availabilitySlots || [];
-      const taggedSlots = rawSlots
-        .map((s, rawIndex) => ({ ...s, rawIndex }))
-        .filter((s) => {
-          const maxSpots = Number(s?.maxSpots ?? 10);
-          const bookedCount = Number(s?.bookedCount ?? s?.sessionCount ?? 0);
-          if (!Number.isFinite(maxSpots) || maxSpots <= 0) return false;
-          if (bookedCount >= maxSpots) return false;
-          const date = String(s?.date || '');
-          if (!date) return false;
-          return date >= today;
-        });
-
-      if (taggedSlots.length === 0) continue;
-
-      console.debug(`[tourScheduleService] type=${typeId} guide=${guideDoc.id} slots=${taggedSlots.length}`);
-=======
       // Check if this guide offers this tour type. This falls back to the
       // guide's assigned destination IDs when older docs or partial writes
       // have no explicit tourTypeIds array yet.
@@ -311,20 +278,14 @@ export async function getTourTypesWithSchedules(): Promise<TourTypeWithSchedules
       if (upcomingSlots.length === 0) continue;
 
       console.debug(`[tourScheduleService] type=${typeId} guide=${guideDoc.id} upcomingSlots=${upcomingSlots.length}`);
->>>>>>> origin/main
       guides.push({
         guideId: guideDoc.id,
         guideName: `${guideData.firstName || ''} ${guideData.lastName || ''}`.trim() || 'Unknown Guide',
         guidePhotoUrl: guideData.photoUrl || guideData.img || '',
         destinationName: guideData.assignedDestName || 'Unknown',
         destinationId: guideData.assignedDestId || '',
-<<<<<<< HEAD
-        date: taggedSlots[0]?.date || today,
-        slots: taggedSlots.map((s) => ({
-=======
         date: upcomingSlots[0]?.date || today,
         slots: upcomingSlots.map((s) => ({
->>>>>>> origin/main
           startTime: s.startTime,
           endTime: s.endTime,
           maxSpots: s.maxSpots ?? 10,
@@ -671,9 +632,10 @@ export async function joinTour(
     });
     await createNotification({
       userId,
-      type: 'reserved',
+      type: 'join_confirmed',
       title: 'Tour Joined',
       message: `You have joined the tour "${session.destinationName}" with guide ${bookedSlot.guideName}.`,
+      sessionId: session.id,
     });
   } catch (err) {
     // Do not report a successful join when the shared session record was not
