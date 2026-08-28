@@ -38,14 +38,10 @@ body {
   background: var(--catour-page);
 }
 
-<<<<<<< HEAD
 .ion-page,
 ion-page {
   background: var(--catour-surface, #ffffff);
 }
-
-=======
->>>>>>> origin/main
 .safe-area-page {
   padding-top: var(--catour-safe-top);
   padding-right: var(--catour-safe-right);
