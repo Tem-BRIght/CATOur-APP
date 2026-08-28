@@ -1,0 +1,65 @@
+name: iOS Build
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-ios:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+<<<<<<< HEAD
+        run: npm install --legacy-peer-deps
+=======
+        run: npm ci --legacy-peer-deps
+>>>>>>> 22feb88 (Merge remote main)
+
+      - name: Build web app
+        run: npm run build
+
+      - name: Create and sync iOS project
+        run: |
+          npx cap add ios
+          npx cap sync ios
+
+      - name: Build unsigned iOS archive
+        run: |
+          xcodebuild \
+            -project ios/App/App.xcodeproj \
+            -scheme App \
+            -configuration Release \
+            -sdk iphoneos \
+            -archivePath "$PWD/build/CaTour.xcarchive" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            archive
+
+      - name: Package unsigned IPA
+        run: |
+          mkdir -p build/ipa/Payload
+          cp -R build/CaTour.xcarchive/Products/Applications/App.app build/ipa/Payload/CaTour.app
+          cd build/ipa
+          zip -r CaTour.ipa Payload
+
+      - name: Upload CaTour IPA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: CaTour-ipa
+<<<<<<< HEAD
+          path: build/ipa/CaTour.ipa
+=======
+          path: build/ipa/CaTour.ipa
+>>>>>>> 22feb88 (Merge remote main)

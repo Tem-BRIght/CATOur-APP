@@ -1,0 +1,294 @@
+/* ── Scan.css ───────────────────────────────────────────────────────────── */
+
+/* Toolbar */
+.scan-toolbar {
+  --background: #000;
+  --color: #fff;
+  --border-color: transparent;
+}
+
+.scan-toolbar ion-title {
+  text-align: center;
+  color: #fff;
+  margin-right: 25px;
+}
+
+.scan-toolbar ion-back-button {
+  --color: #fff;
+}
+
+.scan-hdr-btn {
+  background: none;
+  border: none;
+  color: #fff;
+  font-size: 22px;
+  padding: 8px 12px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+}
+
+/* ── Content ── */
+.scan-content {
+  --background: #000;
+}
+
+/* ── Camera wrap ── */
+.scan-camera-wrap {
+  position: relative;
+  width: 100%;
+  /* 70% of viewport height for the camera area */
+  height: 70vh;
+  background: #000;
+  overflow: hidden;
+}
+
+/* html5-qrcode mounts video into this div */
+#qr-viewfinder {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* Override html5-qrcode internal styles */
+#qr-viewfinder video {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+}
+
+#qr-viewfinder canvas {
+  display: none !important;
+}
+
+/* ── Overlay (dim edges, show frame) ── */
+.scan-frame-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  /* Dark vignette around the frame box */
+  background:
+    /* top */    linear-gradient(to bottom,  rgba(0,0,0,0.55) 0%,   transparent 28%),
+    /* bottom */ linear-gradient(to top,     rgba(0,0,0,0.55) 0%,   transparent 28%),
+    /* left */   linear-gradient(to right,   rgba(0,0,0,0.55) 0%,   transparent 18%),
+    /* right */  linear-gradient(to left,    rgba(0,0,0,0.55) 0%,   transparent 18%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ── Corner brackets ── */
+.scan-corner {
+  position: absolute;
+  width: 30px;
+  height: 30px;
+  border-color: #fff;
+  border-style: solid;
+  /* position the frame box (240×240 centred) */
+  --box: 120px; /* half of 240 */
+}
+
+.scan-corner--tl {
+  top:    calc(50% - var(--box));
+  left:   calc(50% - var(--box));
+  border-width: 3px 0 0 3px;
+  border-radius: 4px 0 0 0;
+}
+.scan-corner--tr {
+  top:    calc(50% - var(--box));
+  right:  calc(50% - var(--box));
+  border-width: 3px 3px 0 0;
+  border-radius: 0 4px 0 0;
+}
+.scan-corner--bl {
+  bottom: calc(50% - var(--box));
+  left:   calc(50% - var(--box));
+  border-width: 0 0 3px 3px;
+  border-radius: 0 0 0 4px;
+}
+.scan-corner--br {
+  bottom: calc(50% - var(--box));
+  right:  calc(50% - var(--box));
+  border-width: 0 3px 3px 0;
+  border-radius: 0 0 4px 0;
+}
+
+/* ── Laser scan line ── */
+.scan-laser {
+  position: absolute;
+  left:  calc(50% - 120px + 4px);
+  right: calc(50% - 120px + 4px);
+  top:   calc(50% - 120px + 4px);
+  height: 2px;
+  background: linear-gradient(to right, transparent, #1a8fe3, #60a5fa, #1a8fe3, transparent);
+  border-radius: 2px;
+  animation: laser-sweep 1.8s ease-in-out infinite;
+  box-shadow: 0 0 6px 2px rgba(96, 165, 250, 0.5);
+}
+
+@keyframes laser-sweep {
+  0%   { top: calc(50% - 116px); opacity: 0; }
+  10%  { opacity: 1; }
+  90%  { opacity: 1; }
+  100% { top: calc(50% + 116px); opacity: 0; }
+}
+
+/* ── Result overlays ── */
+.scan-result-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  animation: scan-fadein 0.25s ease;
+}
+
+@keyframes scan-fadein {
+  from { opacity: 0; transform: scale(0.92); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+.scan-result-overlay--success {
+  background: rgba(0, 0, 0, 0.72);
+}
+
+.scan-result-overlay--error {
+  background: rgba(0, 0, 0, 0.72);
+}
+
+.scan-result-icon {
+  font-size: 64px;
+}
+
+.scan-result-overlay--success .scan-result-icon { color: #4ade80; }
+.scan-result-overlay--error   .scan-result-icon { color: #f87171; }
+
+.scan-result-msg {
+  font-size: 14px;
+  font-weight: 600;
+  color: #fff;
+  text-align: center;
+  max-width: 260px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-all;
+  padding: 0 16px;
+}
+
+/* ── Camera error state ── */
+.scan-cam-error {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  background: #000;
+  padding: 24px;
+  text-align: center;
+}
+
+.scan-cam-err-icon {
+  font-size: 48px;
+  color: #f87171;
+}
+
+.scan-cam-error p {
+  font-size: 14px;
+  color: #d1d5db;
+  line-height: 1.55;
+  margin: 0;
+}
+
+.scan-retry-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: #1d4ed8;
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 700;
+  padding: 12px 24px;
+  cursor: pointer;
+  margin-top: 8px;
+}
+
+/* ── Instructions ── */
+.scan-instructions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 20px 24px 10px;
+  text-align: center;
+}
+
+.scan-inst-icon {
+  font-size: 32px;
+  color: #fff;
+  margin-bottom: 8px;
+  opacity: 0.8;
+}
+
+.scan-inst-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #fff;
+  margin: 0 0 6px;
+}
+
+.scan-inst-sub {
+  font-size: 13px;
+  color: #9ca3af;
+  margin: 0;
+  line-height: 1.5;
+}
+
+/* ── Action buttons ── */
+.scan-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px 24px 32px;
+}
+
+.scan-action-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 14px;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  border: none;
+  transition: opacity 0.15s;
+}
+
+.scan-action-btn:active {
+  opacity: 0.8;
+}
+
+.scan-action-btn--primary {
+  background: #1a8fe3;
+  color: #fff;
+}
+
+.scan-action-btn--secondary {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  border: 1.5px solid rgba(255, 255, 255, 0.2);
+}
+
+.scan-action-btn ion-icon {
+  font-size: 18px;
+}
+
+.scan-file-input {
+  display: none;
+}

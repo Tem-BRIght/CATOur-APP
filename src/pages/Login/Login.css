@@ -1,0 +1,211 @@
+.login-content {
+  --background: linear-gradient(180deg, #fff 10%, #3b92ff 70%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 40px 16px;
+}
+
+.logo-wrap{ 
+  display:flex;
+  justify-content:center;
+  margin: 5rem auto 8px auto;
+  width: 120px;
+  height: 80px;
+}
+.logo{ 
+  width:120px;
+  height:auto;
+  display:block;
+}
+.title {
+  color: #0d2f6e;
+}
+
+.subtitle{ 
+  text-align:center;
+  color:#4b5563;
+  margin:0 0 12px;
+  font-size: 12px;
+}
+.login-card{ 
+  width:100%;
+  max-width:460px;
+  margin: 0 auto;
+  padding: 12px;
+  box-sizing: border-box;
+}
+
+.form{
+  display: flex;
+  flex-direction: column;
+  padding: 32px 35px;
+  border-radius: 24px;
+  margin: 12px;
+  gap: 14px;
+  background-color: #ffffff;
+  box-shadow: 0 18px 40px rgba(31, 78, 121, 0.12);
+}
+
+.google-button img {
+    width: 30px;
+    height: 20px;
+    margin-right: 10px;
+}
+
+.divider{
+  display: flex;
+  align-items: center;
+  color: #ccc;
+  font-size: 14px;
+  margin: 8px 0 12px;
+}
+.divider::before,
+.divider::after{
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: rgba(0,0,0,0.12);
+}
+.divider::before{ margin-right: 12px; }
+.divider::after{ margin-left: 12px; }
+.divider span{
+  background: #fff;
+  padding: 0 8px;
+}
+
+.input-item {
+  --padding-start: 15px;
+  --inner-padding-end: 15px;
+  align-items: center;
+  height: 64px;
+  --background: #EEEEEE;
+  border-radius: 12px;
+}
+
+.input-item .input-icon {
+  color: #9aa4b2;
+  font-size: 24px;
+  margin-right: 15px;
+}
+
+.input-item ion-label{
+  font-size: 12px;
+  margin-bottom: 6px;
+}
+
+.input-item .text-input .native-input,
+.input-item ion-input input {
+  background: transparent;
+  padding: 8px 0 8px 0;
+  font-size: 16px;
+}
+
+/* ── Hide native browser password reveal button ─────────────────────────────
+   Browsers (Chrome, Edge, Safari) inject their own eye icon on password
+   fields. Since we supply a custom toggle, we hide the native one to
+   prevent two icons from appearing simultaneously.                          */
+input[type="password"]::-ms-reveal,
+input[type="password"]::-ms-clear {
+  display: none !important;
+}
+
+/* Webkit / Blink (Chrome, Edge, Safari) */
+input[type="password"]::-webkit-contacts-auto-fill-button,
+input[type="password"]::-webkit-credentials-auto-fill-button {
+  display: none !important;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+/* Target Ionic's internal shadow-DOM input for the same suppression */
+ion-input input[type="password"]::-ms-reveal,
+ion-input input[type="password"]::-ms-clear {
+  display: none !important;
+}
+
+.forgot{
+  text-align: center;
+  color: #000;
+  font-size: 12px;
+  margin-top: 3px;
+}
+
+
+.login-button{ 
+  background-color: #0d2f6e;
+  color: #fff;
+  font-weight: 700;
+  height: 44px;
+  border: none;
+  text-transform: none;
+}
+
+.login-button a{
+  color:#fff; 
+  text-decoration:none; 
+}
+
+.login-status {
+  min-height: 16px;
+  margin-top: -6px;
+  color: #6b7280;
+  font-size: 12px;
+  text-align: center;
+}
+
+.login-status--error {
+  color: #dc2626;
+}
+
+.google-button{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:10px;
+  text-transform: none;
+  height:44px;
+  border-radius:12px;
+  color:#374151;
+  font-weight:600;
+  border: 1px solid rgba(0,0,0,0.04);
+  --border-color: rgba(0,0,0,0.04);
+}
+
+.signup{
+  text-align:center;
+  color:#5ED3FB;
+  font-size:12px;
+}
+
+.signup a{ 
+    color:#000; 
+    text-decoration:none; 
+}
+
+.forgot a{
+    color:#000; 
+    text-decoration:none; 
+}
+
+.google-button:focus,
+.google-button:active,
+.google-button:focus-visible,
+.google-button .button-native:focus {
+  box-shadow: none !important;
+  outline: none !important;
+  border-color: rgba(0,0,0,0.08) !important;
+}
+
+.google-button .button-native {
+  border-color: rgba(0,0,0,0.08) !important;
+  box-shadow: none !important;
+}
+
+.login-button .button-inner,
+.google-button .button-inner,
+.login-button .button-native,
+.google-button .button-native {
+  text-transform: none !important;
+}

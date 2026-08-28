@@ -1,0 +1,29 @@
+/* Scoped styling for the Google profile-completion screen. */
+.google-profile-content {
+  --background: linear-gradient(180deg, #f3f7ff 0, #ffffff 38%);
+}
+
+.google-profile-content .google-profile-card {
+  padding-bottom: 28px;
+}
+
+.google-profile-content .google-profile-form {
+  border: 1px solid rgba(13, 47, 110, 0.08);
+}
+
+.google-profile-back-button {
+  --color: #0d2f6e;
+  margin-left: 4px;
+}
+
+.google-profile-back-button ion-icon {
+  font-size: 24px;
+}
+.login-content{
+  --background: linear-gradient(180deg, #fff 10%, #3b92ff 70%);
+}
+@media (min-width: 600px) {
+  .google-profile-content .google-profile-card {
+    max-width: 520px;
+  }
+}

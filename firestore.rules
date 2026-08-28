@@ -1,0 +1,300 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        (exists(/databases/$(database)/documents/admins/$(request.auth.uid)) &&
+         get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.role in ['admin', 'super-admin']) ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['admin', 'super-admin'])
+      );
+    }
+
+    function isGuide() {
+      return isSignedIn() && (
+        exists(/databases/$(database)/documents/tourGuides/$(request.auth.uid)) ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'tourGuide')
+      );
+    }
+
+    function isSuperAdmin() {
+      return isSignedIn() && (
+        (exists(/databases/$(database)/documents/admins/$(request.auth.uid)) &&
+         get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.role == 'super-admin') ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'super-admin')
+      );
+    }
+
+    function isOwner(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    function isSessionParticipant(data) {
+      return isSignedIn() && (
+        data.guideId == request.auth.uid ||
+        (data.touristUids is list && data.touristUids.hasAny([request.auth.uid]))
+      );
+    }
+
+    function isChatParticipant(data) {
+      return isSignedIn() && data.participants is list &&
+        data.participants.hasAny([request.auth.uid]);
+    }
+
+    match /admins/{adminId} {
+      allow read: if isSignedIn() && (request.auth.uid == adminId || isAdmin());
+      allow create: if isSignedIn() && (request.auth.uid == adminId || isSuperAdmin());
+      allow update: if isSignedIn() && (request.auth.uid == adminId || isSuperAdmin());
+      allow delete: if isSignedIn() && isSuperAdmin();
+    }
+
+    match /users/{uid} {
+      allow create: if isOwner(uid) || isAdmin();
+      allow read, update: if isOwner(uid) || isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    match /tourGuides/{uid} {
+      allow read: if isSignedIn();
+      allow create: if isOwner(uid) || isAdmin();
+      allow update: if isOwner(uid) || isAdmin() || (
+        isSignedIn() &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['availabilitySlots', 'updatedAt'])
+      );
+      allow delete: if isAdmin();
+    }
+
+    match /guideDestinations/{assignmentId} {
+      allow read: if isSignedIn();
+      allow create: if isAdmin() || (
+        isSignedIn() && request.resource.data.guideId == request.auth.uid
+      );
+      allow update: if isAdmin() || (
+        isSignedIn() && (
+          resource.data.guideId == request.auth.uid ||
+          request.resource.data.guideId == request.auth.uid
+        )
+      );
+      allow delete: if isAdmin() || (
+        isSignedIn() && resource.data.guideId == request.auth.uid
+      );
+    }
+
+    match /destinations/{id} {
+      allow read: if true;
+      allow create, delete: if isAdmin();
+      allow update: if isAdmin() || (
+        isSignedIn() &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reviewCount', 'rating']) &&
+        request.resource.data.reviewCount is number &&
+        request.resource.data.rating is number
+      );
+    }
+
+    match /destinations/{destinationId}/reviews/{reviewId} {
+      allow read: if true;
+      allow create: if isAdmin() || (isOwner(reviewId) &&
+        request.resource.data.userId == request.auth.uid &&
+        request.resource.data.destinationId == destinationId);
+      allow update: if isAdmin() || (isOwner(reviewId) &&
+        request.resource.data.userId == request.auth.uid &&
+        request.resource.data.destinationId == destinationId);
+      allow update: if isSignedIn() &&
+        resource.data.allowVenueReply == true &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['replies']) &&
+        request.resource.data.replies is list &&
+        ((!('replies' in resource.data) && request.resource.data.replies.size() == 1) ||
+         (resource.data.replies is list &&
+          request.resource.data.replies.size() == resource.data.replies.size() + 1)) &&
+        request.resource.data.replies[request.resource.data.replies.size() - 1].userId == request.auth.uid;
+      allow delete: if isAdmin() || isOwner(reviewId);
+    }
+
+    match /users/{uid}/reviews/{reviewId} {
+      allow read, write: if isOwner(uid);
+    }
+
+    match /tourTypes/{id} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /sessions/{id} {
+      allow read: if isSignedIn();
+      allow create: if isAdmin() || (
+        isSignedIn() && (
+          request.resource.data.guideId == request.auth.uid ||
+          (
+            request.resource.data.guideId is string &&
+            exists(/databases/$(database)/documents/tourGuides/$(request.resource.data.guideId)) &&
+            request.resource.data.touristUids is list &&
+            request.resource.data.touristUids.hasAny([request.auth.uid]) &&
+            request.resource.data.tourists is list
+          )
+        )
+      );
+      allow update: if isAdmin() || (
+        isSignedIn() && resource.data.guideId == request.auth.uid &&
+        request.resource.data.guideId == request.auth.uid
+      ) || (
+        isSignedIn() &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['tourists', 'touristUids', 'cancelledUids', 'checkedInUids', 'updatedAt'])
+      );
+      allow delete: if isSignedIn() && (resource.data.guideId == request.auth.uid || isAdmin());
+    }
+
+    match /bookings/{id} {
+      allow read: if isAdmin() || isSignedIn();
+      allow create, update: if isAdmin() || isGuide() || isSignedIn();
+      allow delete: if isAdmin();
+    }
+
+    match /visits/{visitId} {
+      allow read: if isSignedIn();
+      allow create, update: if isSignedIn() && (
+        !('userId' in request.resource.data) ||
+        request.resource.data.userId == request.auth.uid ||
+        isAdmin() ||
+        isGuide() ||
+        (request.resource.data.sessionId is string &&
+         exists(/databases/$(database)/documents/sessions/$(request.resource.data.sessionId)) &&
+         get(/databases/$(database)/documents/sessions/$(request.resource.data.sessionId)).data.guideId == request.auth.uid)
+      );
+      allow delete: if isAdmin() || (
+        isSignedIn() && resource.data.userId == request.auth.uid
+      );
+    }
+
+    match /chats/{chatId} {
+      allow read: if isChatParticipant(resource.data);
+      allow create: if isSignedIn() &&
+        request.resource.data.guideId is string &&
+        request.resource.data.touristId is string &&
+        request.resource.data.sessionId is string &&
+        request.resource.data.participants is list &&
+        request.resource.data.participants.hasAny([request.auth.uid]) &&
+        request.resource.data.participants.hasAll([
+          request.resource.data.guideId,
+          request.resource.data.touristId
+        ]) &&
+        isSessionParticipant(get(/databases/$(database)/documents/sessions/$(request.resource.data.sessionId)).data) &&
+        get(/databases/$(database)/documents/sessions/$(request.resource.data.sessionId)).data.touristUids is list &&
+        get(/databases/$(database)/documents/sessions/$(request.resource.data.sessionId)).data.touristUids.hasAny([
+          request.resource.data.touristId
+        ]);
+      allow update: if isChatParticipant(resource.data) &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'lastMessage', 'lastMessageSenderId', 'lastMessageAt'
+        ]) &&
+        request.resource.data.lastMessageSenderId == request.auth.uid;
+      allow delete: if false;
+
+      match /messages/{messageId} {
+        allow read: if isChatParticipant(get(/databases/$(database)/documents/chats/$(chatId)).data);
+        allow create: if isChatParticipant(get(/databases/$(database)/documents/chats/$(chatId)).data) &&
+          request.resource.data.senderId == request.auth.uid &&
+          request.resource.data.text is string &&
+          request.resource.data.text.size() > 0 &&
+          request.resource.data.text.size() <= 4000;
+        allow update, delete: if false;
+      }
+    }
+
+    match /aiGuideHistory/{uid} {
+      allow read, write: if isOwner(uid);
+    }
+
+    match /aiProximityTriggers/{triggerId} {
+      allow create: if isSignedIn() && request.resource.data.uid == request.auth.uid;
+      allow read: if isAdmin();
+      allow update, delete: if isAdmin();
+    }
+
+    match /visitorGrowth/{monthId} {
+      allow read: if isSignedIn();
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /users/{uid}/fcmTokens/{tokenId} {
+      allow read, write: if isOwner(uid);
+    }
+
+    match /notifications/{uid}/items/{itemId} {
+      allow read, write: if isOwner(uid);
+    }
+
+    match /favorites/{uid}/items/{itemId} {
+      allow read, write: if isOwner(uid);
+    }
+
+    match /feedback/{feedbackId} {
+      allow read: if true;
+      allow create, update: if isAdmin() || (isSignedIn() && request.resource.data.touristId == request.auth.uid &&
+        request.resource.data.sessionId is string);
+      allow delete: if isAdmin() || (isSignedIn() && resource.data.touristId == request.auth.uid);
+    }
+
+    match /activityLog/{activityId} {
+      allow read: if isSignedIn() && (isAdmin() || resource.data.sessionId != null);
+      allow create: if isSignedIn() && (
+        request.resource.data.sessionId != null || isAdmin()
+      );
+      allow update, delete: if isAdmin();
+    }
+
+    match /supportTickets/{ticketId} {
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+      allow read: if isAdmin() || isOwner(resource.data.userId);
+      allow update: if (isAdmin() &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'assignedAdminId', 'assignedAdminName', 'lastMessage', 'lastMessageAt',
+          'lastMessageBySenderRole', 'unreadByAdmin', 'unreadByUser', 'status'
+        ]) &&
+        (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['assignedAdminId', 'assignedAdminName']) ||
+         (resource.data.assignedAdminId == null && request.resource.data.assignedAdminId == request.auth.uid) ||
+         (resource.data.assignedAdminId == request.auth.uid && request.resource.data.assignedAdminId == resource.data.assignedAdminId))) ||
+        (isOwner(resource.data.userId) &&
+         request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+           'lastMessage', 'lastMessageAt', 'lastMessageBySenderRole', 'unreadByUser', 'status'
+         ]));
+      allow delete: if isAdmin() || isOwner(resource.data.userId);
+
+      match /messages/{messageId} {
+        allow read: if isAdmin() || isOwner(get(/databases/$(database)/documents/supportTickets/$(ticketId)).data.userId);
+        allow create: if isSignedIn() && request.resource.data.senderId == request.auth.uid &&
+          request.resource.data.senderRole in ['user', 'admin'] &&
+          request.resource.data.text is string && request.resource.data.text.size() > 0 &&
+          request.resource.data.text.size() <= 4000 &&
+          ((request.resource.data.senderRole == 'user' &&
+            isOwner(get(/databases/$(database)/documents/supportTickets/$(ticketId)).data.userId)) ||
+           (request.resource.data.senderRole == 'admin' &&
+            get(/databases/$(database)/documents/supportTickets/$(ticketId)).data.assignedAdminId == request.auth.uid));
+        allow update: if isAdmin() || isOwner(get(/databases/$(database)/documents/supportTickets/$(ticketId)).data.userId);
+        allow delete: if false;
+      }
+    }
+
+    match /problemReports/{reportId} {
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+      allow read: if isAdmin() || isOwner(resource.data.userId);
+      allow update, delete: if isAdmin() || isOwner(resource.data.userId);
+    }
+
+    match /counters/{counterId} {
+      allow read: if isSignedIn();
+      allow create, update: if isAdmin() || isGuide() || isSignedIn();
+      allow delete: if isAdmin();
+    }
+
+    match /{document=**} {
+      allow read: if false;
+      allow write: if false;
+    }
+  }
+}

@@ -1,0 +1,18 @@
+$bp-phone-sm: 360px;
+$bp-phone: 480px;
+$bp-tablet: 768px;
+$bp-tablet-lg: 1024px;
+$bp-desktop: 1280px;
+$bp-desktop-lg: 1440px;
+
+@mixin from($bp) {
+  @media (min-width: $bp) { @content; }
+}
+
+@mixin until($bp) {
+  @media (max-width: ($bp - 1px)) { @content; }
+}
+
+@mixin between($min, $max) {
+  @media (min-width: $min) and (max-width: ($max - 1px)) { @content; }
+}

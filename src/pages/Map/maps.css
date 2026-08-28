@@ -1,0 +1,470 @@
+/* ─────────────────────────────────────────────────────────
+   Full-page layout wrapper
+───────────────────────────────────────────────────────── */
+.map-page-wrapper {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+/* ─────────────────────────────────────────────────────────
+   Map fills the whole page — rendered first, behind everything
+───────────────────────────────────────────────────────── */
+.map-container {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+  background: #e8e0d8;
+  z-index: 0;
+}
+
+.map-container.hidden {
+  display: none;
+}
+
+/* ─────────────────────────────────────────────────────────
+   UI overlay layer — sits on top of the map at all times
+───────────────────────────────────────────────────────── */
+.map-ui-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;   /* let map touches pass through by default */
+  z-index: 1000;          /* above ALL Leaflet panes (max ~600)       */
+  display: flex;
+  flex-direction: column;
+}
+
+/* ─────────────────────────────────────────────────────────
+   Header: back arrow + search bar + clear btn
+───────────────────────────────────────────────────────── */
+.map-header {
+  pointer-events: auto;   /* header is interactive */
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: #fff;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+  flex-shrink: 0;
+}
+
+/* Back arrow button */
+.map-back-btn {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: none;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: #0F172A;
+  font-size: 22px;
+  padding: 0;
+  transition: background 0.15s;
+}
+
+.map-back-btn:active {
+  background: #F1F5F9;
+}
+
+/* Pill search bar */
+.map-search-bar {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #F1F5F9;
+  border-radius: 999px;
+  padding: 9px 14px;
+  border: 1.5px solid transparent;
+  transition: border-color 0.2s, background 0.2s;
+  min-width: 0;
+}
+
+.map-search-bar:focus-within {
+  background: #fff;
+  border-color: #1a8fe3;
+}
+
+.map-search-icon {
+  font-size: 17px;
+  color: #64748B;
+  flex-shrink: 0;
+}
+
+.map-search-input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  outline: none;
+  font-family: 'DM Sans', 'Sora', sans-serif;
+  font-size: 15px;
+  font-weight: 500;
+  color: #0F172A;
+  min-width: 0;
+}
+
+.map-search-input::placeholder {
+  color: #94A3B8;
+  font-weight: 400;
+}
+
+/* Clear (X) button */
+.map-clear-btn {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: none;
+  background: #CBD5E1;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  cursor: pointer;
+  padding: 0;
+  transition: background 0.15s;
+}
+
+.map-clear-btn:active {
+  background: #94A3B8;
+}
+
+/* ─────────────────────────────────────────────────────────
+   Search wrapper — contains header + floating results panel.
+   position:relative lets the panel anchor to the header bottom.
+───────────────────────────────────────────────────────── */
+.map-search-wrapper {
+  position: relative;
+  flex-shrink: 0;
+  pointer-events: auto;
+  z-index: 1001;
+}
+
+/* ─────────────────────────────────────────────────────────
+   Search Results Panel — floats OVER the map, anchored
+   to the bottom of the header. No longer in the flex flow.
+───────────────────────────────────────────────────────── */
+.search-results-panel {
+  pointer-events: auto;
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: #fff;
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.22s ease;
+  border-bottom: 1px solid #F1F5F9;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+}
+
+.search-results-panel.open {
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+/* Result count label */
+.results-count {
+  padding: 8px 16px 4px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #94A3B8;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-family: 'DM Sans', sans-serif;
+}
+
+.result-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  border-bottom: 1px solid #F1F5F9;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+
+.result-item:last-child {
+  border-bottom: none;
+}
+
+.result-item:active,
+.result-item.active {
+  background: #EFF6FF;
+}
+
+.result-item.keyboard-focus {
+  background: #DBEAFE;
+  outline: none;
+}
+
+.result-pin-icon {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: #EFF6FF;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #1a8fe3;
+  font-size: 18px;
+}
+
+.result-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.result-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: #0F172A;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-family: 'DM Sans', sans-serif;
+}
+
+.result-addr {
+  font-size: 12px;
+  color: #64748B;
+  margin-top: 2px;
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-family: 'DM Sans', sans-serif;
+}
+
+.result-dist {
+  flex-shrink: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: #475569;
+  text-align: right;
+  white-space: nowrap;
+  font-family: 'DM Sans', sans-serif;
+}
+
+/* ── Loading shimmer ── */
+.search-loading {
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.shimmer-row {
+  height: 14px;
+  border-radius: 6px;
+  background: linear-gradient(90deg, #F1F5F9 25%, #E2E8F0 50%, #F1F5F9 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.2s infinite;
+}
+
+.shimmer-row.short {
+  width: 55%;
+  height: 11px;
+}
+
+@keyframes shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* ── No results ── */
+.no-results {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 32px 16px 28px;
+  color: #94A3B8;
+  font-size: 14px;
+  text-align: center;
+  font-family: 'DM Sans', sans-serif;
+}
+
+.no-results ion-icon {
+  font-size: 30px;
+  color: #CBD5E1;
+}
+
+.no-results p {
+  margin: 0;
+  color: #64748B;
+  font-size: 14px;
+}
+
+.no-results-hint {
+  font-size: 12px;
+  color: #94A3B8;
+}
+
+/* ─────────────────────────────────────────────────────────
+   Loading / Error
+───────────────────────────────────────────────────────── */
+.map-loading,
+.map-error {
+  pointer-events: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  padding: 20px;
+  text-align: center;
+  color: #666;
+  font-family: 'DM Sans', sans-serif;
+}
+
+.map-error { color: #e53935; }
+
+.map-load-error {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  background: rgba(255, 255, 255, 0.94);
+  color: #334155;
+}
+
+.map-load-error button {
+  border: 0;
+  border-radius: 8px;
+  padding: 10px 16px;
+  background: #0f766e;
+  color: #fff;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+/* ─────────────────────────────────────────────────────────
+   Selected Destination Bottom Card
+───────────────────────────────────────────────────────── */
+.dest-bottom-card {
+  pointer-events: auto;
+  position: absolute;
+  bottom: 20px;
+  left: 12px;
+  right: 12px;
+  background: #fff;
+  border-radius: 18px;
+  box-shadow: 0 6px 28px rgba(0, 0, 0, 0.15);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  animation: cardUp 0.22s ease;
+}
+
+@keyframes cardUp {
+  from { transform: translateY(16px); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+
+.dest-card-img {
+  width: 56px;
+  height: 56px;
+  border-radius: 12px;
+  object-fit: cover;
+  flex-shrink: 0;
+  background: #F1F5F9;
+}
+
+.dest-card-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.dest-card-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: #0F172A;
+  font-family: 'DM Sans', sans-serif;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin: 0 0 3px;
+}
+
+.dest-card-addr {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 11px;
+  color: #64748B;
+  font-family: 'DM Sans', sans-serif;
+  margin: 0 0 5px;
+}
+
+.dest-card-addr ion-icon {
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.dest-card-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.dest-card-rating {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #F59E0B;
+  font-family: 'DM Sans', sans-serif;
+}
+
+.dest-card-rating ion-icon {
+  font-size: 13px;
+}
+
+.dest-card-dist {
+  font-size: 12px;
+  color: #64748B;
+  font-family: 'DM Sans', sans-serif;
+}
+
+/* Go button */
+.dest-go-btn {
+  flex-shrink: 0;
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+  background: #1a8fe3;
+  border: none;
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 700;
+  font-family: 'DM Sans', sans-serif;
+  transition: background 0.15s;
+}
+
+.dest-go-btn ion-icon {
+  font-size: 22px;
+}
+
+.dest-go-btn:active {
+  background: #0d2f6e;
+}

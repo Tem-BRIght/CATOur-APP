@@ -1,0 +1,353 @@
+.profile-content {
+  --background: #f0f4f8;
+}
+
+
+/* ── Top hero section (gradient — avatar only) ── */
+.profile-page-top-section {
+  text-align: center;
+  padding: 32px 20px 0;
+  background: linear-gradient(180deg, #ffffff 0%, #5ba4ff 100%);
+  color: #000;
+  padding-bottom: 56px; /* space so avatar overlaps downward */
+}
+
+.profile-page-top-section--editing {
+  padding: 40px 20px 0;
+  background: linear-gradient(180deg, #a8d0ff 0%, #5ba4ff 100%);
+  padding-bottom: 80px;
+}
+
+/* ── Name area — below gradient, overlapped by avatar ── */
+.profile-name-area {
+  background: #ffffff;
+  text-align: center;
+  padding-top: 56px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #e8eef6;
+}
+
+.profile-page-photo-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-bottom: 60px;
+  cursor: pointer;
+  position: relative;
+}
+
+.profile-page-avatar-wrapper {
+  position: relative;
+  display: inline-block;
+  width: 110px;
+  height: 110px;
+  margin-bottom: -55px; /* overlaps down into the white name area */
+  transition: width 0.25s ease, height 0.25s ease;
+}
+
+.profile-page-avatar-wrapper--editing {
+  width: 110px;
+  height: 110px;
+  margin-bottom: -55px;
+}
+
+.profile-page-avatar {
+  width: 100% !important;
+  height: 100% !important;
+  border: 4px solid #fff;
+  box-shadow: 0 6px 24px rgba(54, 124, 255, 0.35);
+}
+
+.profile-page-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Hover overlay for camera (still helpful but not clickable styling) */
+.camera-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.6);
+  border-radius: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  font-size: 12px;
+  gap: 4px;
+  cursor: pointer;
+}
+
+.camera-overlay ion-icon {
+  font-size: 24px;
+}
+
+.avatar-wrapper:hover .camera-overlay {
+  opacity: 1;
+}
+
+.camera-icon {
+  position: absolute;
+  bottom: 4px;
+  right: 4px;
+  background: #007bff;
+  border-radius: 50%;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2.5px solid #fff;
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+  font-size: 18px;
+  z-index: 2;
+}
+
+.profile-page-name {
+  font-size: 22px;
+  font-weight: 700;
+  margin: 8px 0 4px;
+  color: #1a2540;
+}
+
+.profile-page-username {
+  color: #0d2f6e;
+  font-size: 14px;
+  font-weight: 500;
+  margin: 0;
+}
+
+/* ── Personal info section (clean list) ── */
+.personal-info-section {
+  background: #ffffff;
+  padding: 20px 16px 24px;
+  min-height: 100%;
+}
+
+/* Section heading */
+.personal-info-section > h2 {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: #8fa3c0;
+  margin: 0 4px 16px;
+}
+
+/* Edit-mode group headings */
+.edit-section-label {
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.8px !important;
+  text-transform: uppercase !important;
+  color: #8fa3c0 !important;
+  margin: 20px 4px 8px !important;
+}
+
+.edit-section-label:first-of-type {
+  margin-top: 0 !important;
+}
+
+.info-list {
+  background: transparent;
+  margin: 0;
+  padding: 0;
+}
+
+.info-list ion-icon {
+  color: #0d2f6e;
+  font-size: 22px;
+  margin-right: 16px;
+}
+
+.info-list ion-label h3 {
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  color: #8fa3c0 !important;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 4px;
+}
+
+.info-list ion-label p {
+  font-size: 15px !important;
+  font-weight: 500 !important;
+  color: #1a2540 !important;
+  margin: 0;
+}
+
+/* ── Edit-mode list items ── */
+.edit-list {
+  background: transparent !important;
+  --ion-background-color: transparent;
+}
+
+.edit-list ion-label {
+  font-size: 10px !important;
+  font-weight: 700 !important;
+  color: #8fa3c0 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.6px !important;
+  margin-bottom: 2px !important;
+}
+
+.edit-list ion-input,
+.edit-list ion-select {
+  font-size: 15px !important;
+  font-weight: 500 !important;
+  color: #1a2540 !important;
+  --placeholder-color: #c5d0e0;
+  --placeholder-font-style: normal;
+}
+
+.edit-list ion-label.age-validation-label {
+  display: block;
+  margin-top: 6px !important;
+  color: #6b7280 !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+  text-transform: none !important;
+  letter-spacing: 0 !important;
+}
+
+.edit-list ion-label.age-validation-label--error {
+  color: #dc2626 !important;
+}
+
+/* Save/Cancel toolbar */
+.personal-info-section ion-toolbar.edit-actions {
+  --background: transparent;
+  --border-width: 0;
+  margin-top: 24px;
+  padding: 0;
+}
+
+.personal-info-section ion-toolbar.edit-actions ion-button {
+  font-weight: 700;
+  font-size: 14px;
+  --border-radius: 10px;
+  --padding-start: 16px;
+  --padding-end: 16px;
+  height: 44px;
+}
+
+/* Error banner */
+.error-banner {
+  background-color: #fef2f2;
+  border: 1px solid #fca5a5;
+  border-radius: 10px;
+  padding: 14px 16px;
+  margin: 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.error-banner p {
+  color: #c0392b;
+  margin: 0;
+  font-size: 14px;
+}
+
+/* Empty state */
+.empty-state {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 200px;
+  color: #999;
+  font-size: 16px;
+  padding: 24px;
+  text-align: center;
+}
+
+.profile-completion-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  background: rgba(255, 255, 255, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  border-radius: 999px;
+  padding: 4px 14px 4px 10px;
+}
+ 
+.completion-ring {
+  position: relative;
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+}
+ 
+.completion-ring svg {
+  transform: rotate(-90deg);
+}
+ 
+.completion-ring-bg {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.3);
+  stroke-width: 3;
+}
+ 
+.completion-ring-fill {
+  fill: none;
+  stroke-width: 3;
+  stroke-linecap: round;
+  transition: stroke-dashoffset 0.6s ease;
+}
+ 
+.completion-ring-text {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 7px;
+  font-weight: 800;
+  color: #fff;
+}
+ 
+.completion-text {
+  font-size: 12px;
+  font-weight: 600;
+  color: #fff;
+  white-space: nowrap;
+}
+/* ── Profile name row with verified badge ── */
+.profile-page-name-row {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin: 8px 0 4px;
+}
+
+.profile-page-name-row .profile-page-name {
+  margin: 0;
+}
+
+/* Verified badge icon next to name */
+.email-verified-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  color: rgba(255, 255, 255, 0.35);
+  flex-shrink: 0;
+  margin-top: 1px;
+  filter: drop-shadow(0 1px 2px rgba(0,0,0,0.15));
+  transition: color 0.2s ease;
+}
+
+.email-verified-badge--active {
+  color: #60a5fa;   /* bright blue — matches the blue badge in the photo */
+}

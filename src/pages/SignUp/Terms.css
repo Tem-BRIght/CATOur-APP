@@ -1,0 +1,133 @@
+/* ── Scope everything to .terms-page to avoid leaking into signup/other pages ── */
+
+.terms-page ion-content {
+  --background: #f9fafb;
+}
+
+/* Header */
+.terms-header {
+  text-align: center;
+  padding: 28px 20px 20px;
+  background: #fff;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.terms-header h2 {
+  font-size: 20px;
+  font-weight: 700;
+  color: #111827;
+  margin: 0 0 4px;
+}
+
+.terms-header p {
+  font-size: 12px;
+  color: #9ca3af;
+  margin: 0;
+}
+
+/* ── Tab bar ── */
+.terms-tabs {
+  display: flex;
+  background: #fff;
+  border-bottom: 1px solid #e5e7eb;
+  padding: 0 16px;
+  gap: 8px;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.terms-tab {
+  flex: 1;
+  padding: 12px 8px;
+  background: none;
+  border: none;
+  /* box-shadow sits ON TOP of the container border — no overflow clipping issue */
+  box-shadow: inset 0 -2.5px 0 transparent;
+  font-size: 14px;
+  font-weight: 600;
+  color: #6b7280;
+  cursor: pointer;
+  transition: color 0.15s ease, box-shadow 0.15s ease;
+  outline: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.terms-tab--active {
+  color: #0d2f6e;
+  box-shadow: inset 0 -2.5px 0 #0d2f6e;
+}
+
+/* ── Content sections ── */
+.terms-body {
+  padding: 16px;
+}
+
+.terms-section {
+  background: #fff;
+  border-radius: 14px;
+  padding: 18px 16px;
+  margin-bottom: 14px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
+}
+
+/* Use !important to beat signup.css global ion-label / ion-item bleed */
+.terms-section h3 {
+  font-size: 14px !important;
+  font-weight: 700 !important;
+  color: #111827 !important;
+  margin: 0 0 8px !important;
+  display: flex !important;
+  align-items: center;
+  gap: 8px;
+  line-height: 1.4;
+  text-transform: none !important;
+  letter-spacing: normal !important;
+}
+
+.terms-section h3 ion-icon {
+  color: #0d2f6e;
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.terms-section p {
+  font-size: 13px !important;
+  line-height: 1.65 !important;
+  color: #4b5563 !important;
+  margin: 0 0 8px !important;
+  font-weight: 400 !important;
+  display: block !important;
+  text-transform: none !important;
+}
+
+.terms-section p:last-child {
+  margin-bottom: 0 !important;
+}
+
+.terms-section ul {
+  margin: 6px 0 0;
+  padding-left: 18px;
+}
+
+.terms-section ul li {
+  font-size: 13px;
+  color: #4b5563;
+  line-height: 1.65;
+  margin-bottom: 4px;
+}
+
+/* ── Acceptance strip ── */
+.terms-accept {
+  padding: 8px 16px 32px;
+}
+
+.terms-accept p {
+  font-size: 12px !important;
+  color: #9ca3af !important;
+  text-align: center;
+  margin-bottom: 10px !important;
+  line-height: 1.5 !important;
+  font-weight: 400 !important;
+  display: block !important;
+}

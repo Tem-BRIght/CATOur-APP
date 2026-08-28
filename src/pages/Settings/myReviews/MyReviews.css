@@ -1,0 +1,484 @@
+/* ── MyReviews.css ──────────────────────────────────────────────────────── */
+
+ion-title {
+  text-align: center;
+  margin-right: 25px;
+}
+
+.mr-content {
+  --background: #f9fafb;
+}
+
+/* ── Profile card ── */
+.mr-profile-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 16px 16px 4px;
+  padding: 16px;
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.06);
+}
+
+.mr-profile-avatar {
+  width: 58px;
+  height: 58px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 22px;
+  font-weight: 800;
+  flex-shrink: 0;
+  overflow: hidden;
+  box-shadow: 0 3px 10px rgba(99, 102, 241, 0.3);
+}
+
+.mr-profile-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.mr-profile-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.mr-profile-name {
+  font-size: 16px;
+  font-weight: 800;
+  color: #111;
+  margin: 0 0 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mr-profile-email {
+  font-size: 12px;
+  color: #9ca3af;
+  margin: 0 0 8px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mr-profile-stats {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.mr-profile-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.mr-profile-stat-val {
+  font-size: 15px;
+  font-weight: 800;
+  color: #0d2f6e;
+  line-height: 1;
+}
+
+.mr-profile-stat-label {
+  font-size: 11px;
+  color: #9ca3af;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.mr-profile-stat-divider {
+  width: 1px;
+  height: 28px;
+  background: #e5e7eb;
+}
+
+/* ── Reviewer strip on each card ── */
+.mr-reviewer-strip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px 10px;
+  border-top: 1px solid #f1f1f1;
+  background: #fafafa;
+}
+
+.mr-reviewer-avatar {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 800;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.mr-reviewer-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.mr-reviewer-anon {
+  font-size: 13px;
+  font-weight: 700;
+  color: #9ca3af;
+}
+
+.mr-reviewer-avatar:has(.mr-reviewer-anon) {
+  background: #e5e7eb;
+}
+
+.mr-reviewer-info {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  flex: 1;
+  min-width: 0;
+}
+
+.mr-reviewer-label {
+  font-size: 10px;
+  color: #9ca3af;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.mr-reviewer-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: #374151;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mr-reviewer-you-pill {
+  font-size: 10px;
+  font-weight: 700;
+  color: #0d2f6e;
+  background: #dbeafe;
+  border-radius: 20px;
+  padding: 2px 8px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 16px 16px 8px;
+}
+
+.mr-summary-count {
+  font-size: 22px;
+  font-weight: 800;
+  color: #0d2f6e;
+}
+
+.mr-summary-label {
+  font-size: 14px;
+  color: #6b7280;
+  font-weight: 500;
+}
+
+/* ── List wrapper ── */
+.mr-list {
+  padding: 0 16px;
+}
+
+/* ── Card ── */
+.mr-card {
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.06);
+  margin-bottom: 14px;
+  overflow: hidden;
+}
+
+/* ── Card header (destination) ── */
+.mr-card-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 14px 10px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.mr-card-header:active {
+  background: #f9fafb;
+}
+
+.mr-card-thumb-wrap {
+  flex-shrink: 0;
+}
+
+.mr-card-thumb {
+  width: 60px;
+  height: 60px;
+  border-radius: 10px;
+  object-fit: cover;
+  display: block;
+}
+
+.mr-card-thumb--placeholder {
+  width: 60px;
+  height: 60px;
+  border-radius: 10px;
+  background: #f3f4f6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 26px;
+}
+
+.mr-card-dest-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.mr-card-dest-name {
+  font-size: 15px;
+  font-weight: 700;
+  color: #111;
+  margin: 0 0 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mr-card-date {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: #9ca3af;
+  margin: 4px 0 0;
+}
+
+.mr-card-arrow {
+  color: #d1d5db;
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+/* ── Stars ── */
+.mr-star-row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.mr-star {
+  font-size: 13px;
+  color: #d1d5db;
+}
+
+.mr-star.filled {
+  color: #f59e0b;
+}
+
+.mr-star-value {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #374151;
+  margin-left: 4px;
+}
+
+/* ── Anonymous badge ── */
+.mr-anon-badge {
+  display: inline-flex;
+  align-items: center;
+  background: #f3f4f6;
+  color: #6b7280;
+  font-size: 10px;
+  font-weight: 600;
+  border-radius: 20px;
+  padding: 1px 7px;
+  margin-left: 6px;
+}
+
+/* ── Body text ── */
+.mr-card-body {
+  padding: 0 14px 10px;
+  border-top: 1px solid #f1f1f1;
+}
+
+.mr-card-feeling {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #0d2f6e;
+  margin: 10px 0 4px;
+}
+
+.mr-card-text {
+  font-size: 13.5px;
+  color: #374151;
+  line-height: 1.55;
+  margin: 0;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* ── Meta icon ── */
+.mr-meta-icon {
+  font-size: 13px;
+  vertical-align: middle;
+  color: #9ca3af;
+}
+
+/* ── Meta chips ── */
+.mr-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 6px 14px 10px;
+}
+
+.mr-meta-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: #f3f4f6;
+  color: #374151;
+  font-size: 12px;
+  font-weight: 500;
+  border-radius: 20px;
+  padding: 4px 10px;
+}
+
+.mr-meta-chip ion-icon {
+  font-size: 12px;
+  color: #6b7280;
+}
+
+/* ── Photos strip ── */
+.mr-card-photos {
+  display: flex;
+  gap: 6px;
+  padding: 0 14px 10px;
+  overflow-x: auto;
+}
+
+.mr-photo-thumb {
+  width: 72px;
+  height: 72px;
+  border-radius: 8px;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.mr-photo-more {
+  width: 72px;
+  height: 72px;
+  border-radius: 8px;
+  background: #e5e7eb;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 700;
+  color: #6b7280;
+  flex-shrink: 0;
+}
+
+/* ── Card actions ── */
+.mr-card-actions {
+  display: flex;
+  border-top: 1px solid #f1f1f1;
+}
+
+.mr-action-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 12px;
+  border: none;
+  background: none;
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.mr-action-btn:active {
+  background: #f3f4f6;
+}
+
+.mr-action-btn--edit {
+  color: #0d2f6e;
+  border-right: 1px solid #f1f1f1;
+}
+
+.mr-action-btn--delete {
+  color: #dc2626;
+}
+
+.mr-action-btn ion-icon {
+  font-size: 15px;
+}
+
+/* ── Empty state ── */
+.mr-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 80px 32px 40px;
+  text-align: center;
+}
+
+.mr-empty-icon {
+  font-size: 64px;
+  margin-bottom: 20px;
+  opacity: 0.7;
+}
+
+.mr-empty-title {
+  font-size: 20px;
+  font-weight: 800;
+  color: #111;
+  margin: 0 0 10px;
+}
+
+.mr-empty-sub {
+  font-size: 14px;
+  color: #6b7280;
+  line-height: 1.55;
+  margin: 0 0 28px;
+}
+
+.mr-empty-btn {
+  background: linear-gradient(135deg, #1a8fe3 0%, #0d2f6e 100%);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+  border: none;
+  border-radius: 12px;
+  padding: 14px 28px;
+  cursor: pointer;
+  box-shadow: 0 3px 12px rgba(59, 130, 246, 0.35);
+}
+
+/* Danger alert button colour */
+.alert-button-danger {
+  color: #dc2626 !important;
+}

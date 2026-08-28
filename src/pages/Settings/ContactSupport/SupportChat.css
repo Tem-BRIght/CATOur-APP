@@ -1,0 +1,168 @@
+/* src/pages/Settings/ContactSupport/SupportChat.css */
+
+.support-chat-content {
+  --background: #f3f4f6;
+}
+
+/* ── Header ─────────────────────────────────────────────────────────────── */
+
+.support-chat-title {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  line-height: 1.1;
+}
+
+.support-status-pill {
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 9px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.support-status--waiting { background: #f3f4f6; color: #4b5563; }
+.support-status--active  { background: #eff6ff; color: #1d4ed8; }
+.support-status--resolved{ background: #ecfdf5; color: #047857; }
+
+/* ── Empty / loading state ─────────────────────────────────────────────── */
+
+.support-chat-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  height: 60vh;
+  color: #9ca3af;
+  text-align: center;
+  padding: 0 32px;
+}
+
+.support-chat-empty ion-icon {
+  font-size: 40px;
+}
+
+.support-chat-empty p {
+  margin: 0;
+  font-size: 14px;
+}
+
+/* ── Message list ───────────────────────────────────────────────────────── */
+
+.support-chat-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 16px 14px 8px;
+}
+
+.chat-bubble-row {
+  display: flex;
+  justify-content: flex-start;
+}
+
+.chat-bubble-row--mine {
+  justify-content: flex-end;
+}
+
+.chat-bubble {
+  max-width: 78%;
+  padding: 9px 13px 7px;
+  border-radius: 16px 16px 16px 4px;
+  background: #fff;
+  color: #111827;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.05);
+}
+
+.chat-bubble--mine {
+  border-radius: 16px 16px 4px 16px;
+  background: linear-gradient(135deg, #1a8fe3 0%, #1d62d6 100%);
+  color: #fff;
+}
+
+.chat-bubble-sender {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  color: #1d4ed8;
+  margin-bottom: 2px;
+}
+
+.chat-bubble p {
+  margin: 0;
+  font-size: 14.5px;
+  line-height: 1.4;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.chat-bubble-time {
+  display: block;
+  margin-top: 3px;
+  font-size: 10.5px;
+  opacity: 0.65;
+  text-align: right;
+}
+
+/* ── Resolved banner ────────────────────────────────────────────────────── */
+
+.support-chat-resolved-note {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 4px 14px 14px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  color: #92400e;
+  font-size: 12.5px;
+}
+
+.support-chat-resolved-note ion-icon {
+  font-size: 15px;
+  flex-shrink: 0;
+}
+
+/* ── Input footer ───────────────────────────────────────────────────────── */
+
+.support-chat-footer {
+  background: #fff;
+  border-top: 1px solid #e5e7eb;
+}
+
+.support-chat-input-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  padding: 8px 10px;
+  padding-bottom: calc(8px + env(safe-area-inset-bottom));
+}
+
+.support-chat-input {
+  --background: #f3f4f6;
+  --padding-start: 12px;
+  --padding-end: 12px;
+  --padding-top: 8px;
+  --padding-bottom: 8px;
+  border-radius: 18px;
+  background: #f3f4f6;
+  flex: 1;
+  max-height: 120px;
+  font-size: 14.5px;
+}
+
+.support-chat-send {
+  --border-radius: 50%;
+  --padding-start: 0;
+  --padding-end: 0;
+  width: 40px;
+  height: 40px;
+  margin: 0;
+  flex-shrink: 0;
+}
