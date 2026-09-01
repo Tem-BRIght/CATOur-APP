@@ -273,6 +273,7 @@ const TourPage: React.FC = () => {
       return;
     }
     const key = `${guideId}-${rawIndex}`;
+    if (joining === key || joining) return;
     setJoining(key);
     try {
       await joinTour(user.uid, guideId, rawIndex, tourTypeId, tourTypeName, {
@@ -316,9 +317,18 @@ const TourPage: React.FC = () => {
 
     try {
       await cancelJoinedSession(session.id, user.uid, reason);
-      setJoinedSessions((current) => current.map((item) => item.id === session.id
-        ? { ...item, status: 'Cancelled', cancelReason: reason.trim() }
-        : item));
+      const cancelledAt = new Date().toISOString();
+      const cancelledSession: TourSession = {
+        ...session,
+        id: `${session.id}__cancelled__${cancelledAt}`,
+        status: 'Cancelled',
+        cancelReason: reason.trim(),
+        cancelledAt,
+      };
+      setJoinedSessions((current) => [
+        ...current.filter((item) => item.id !== session.id),
+        cancelledSession,
+      ]);
       setToastMsg('Joined tour cancelled. A slot has been freed up.');
       await loadData();
       if (activeSlotsTypeId) {
@@ -556,9 +566,10 @@ const TourPage: React.FC = () => {
                       ? (isActive ? 'Ongoing' : 'Checked-In')
                       : 'Reserved';
                     const isLast = index === joinedSessions.length - 1;
+                    const rowKey = `${s.id}-${isCancelled ? 'cancelled' : 'joined'}-${s.status}-${s.cancelledAt || s.startTime || 'n/a'}`;
 
                   return (
-                    <div key={s.id} className={`ht-row ${isLast ? 'ht-row--last' : ''}`}>
+                    <div key={rowKey} className={`ht-row ${isLast ? 'ht-row--last' : ''}`}>
                       <div className="ht-spine">
                         <div className={`ht-dot ${dotClass}`}>
                           <IonIcon icon={checkmarkCircleOutline} />

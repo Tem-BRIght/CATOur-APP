@@ -124,19 +124,16 @@
 }
 
 .header-col-name {
-  width: 26%;
+  width: 32%;
   padding-left: 0.5rem;
-}
-
-.header-col-gender,
-.header-col-nationality,
-.header-col-religion {
-  width: 16%;
-  padding-left: 0.5rem;
-  font-size: 0.83rem;
 }
 
 .header-col-email {
+  width: 38%;
+  padding-left: 0.5rem;
+}
+
+.header-col-status {
   width: 18%;
   padding-left: 0.5rem;
 }
@@ -149,15 +146,11 @@
 .tourist-table-header--completed .header-col-id,
 .tourist-page-row--completed .row-col-id { width: 6%; }
 .tourist-table-header--completed .header-col-name,
-.tourist-page-row--completed .row-col-name { width: 22%; }
-.tourist-table-header--completed .header-col-gender,
-.tourist-table-header--completed .header-col-nationality,
-.tourist-table-header--completed .header-col-religion,
-.tourist-page-row--completed .row-col-gender,
-.tourist-page-row--completed .row-col-nationality,
-.tourist-page-row--completed .row-col-religion { width: 12%; }
+.tourist-page-row--completed .row-col-name { width: 30%; }
 .tourist-table-header--completed .header-col-email,
-.tourist-page-row--completed .row-col-email { width: 10%; }
+.tourist-page-row--completed .row-col-email { width: 34%; }
+.tourist-table-header--completed .header-col-status,
+.tourist-page-row--completed .row-col-status { width: 16%; }
 .tourist-page-row--completed .row-col-feedback { width: 14%; }
 
 .tourist-page-list {
@@ -187,23 +180,41 @@
 }
 
 .row-col-name {
-  width: 26%;
+  width: 32%;
   padding-left: 0.5rem;
   display: flex;
   align-items: center;
   gap: 0.75rem;
 }
 
-.row-col-gender,
-.row-col-nationality,
-.row-col-religion {
-  width: 16%;
+.row-col-email {
+  width: 38%;
   padding-left: 0.5rem;
-  color: #334155;
+  color: #5a6a7a;
   font-size: 0.82rem;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.row-col-status {
+  width: 18%;
+  padding-left: 0.5rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.status-joined {
+  color: #1a8fe3;
+}
+
+.status-checked-in {
+  color: #2e7d32;
+}
+
+.status-cancelled {
+  color: #c62828;
 }
 
 .tourist-avatar {
@@ -217,16 +228,6 @@
   font-weight: 600;
   color: #0d2f6e;
   font-size: 0.93rem;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.row-col-email {
-  width: 18%;
-  padding-left: 0.5rem;
-  color: #5a6a7a;
-  font-size: 0.82rem;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -431,22 +432,18 @@
     grid-column: 1 / -1;
   }
 
-  .row-col-gender::before,
-  .row-col-nationality::before,
-  .row-col-religion::before,
-  .row-col-email::before {
+  .row-col-email::before,
+  .row-col-status::before {
     display: block;
     color: #8fa3bc;
-    content: 'Gender';
+    content: 'Email';
     font-size: 0.68rem;
     font-weight: 600;
     margin-bottom: 0.15rem;
     text-transform: uppercase;
   }
 
-  .row-col-nationality::before { content: 'Nationality'; }
-  .row-col-religion::before { content: 'Religion'; }
-  .row-col-email::before { content: 'Email'; }
+  .row-col-status::before { content: 'Status'; }
 
   .row-col-feedback {
     grid-column: 1 / -1;
@@ -462,10 +459,12 @@
 }
 
 .session-fab {
-  display: flex;
+  display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 0.5rem;
-  padding: 0.75rem 1.3rem;
+  min-width: 164px;
+  padding: 0.8rem 1.35rem;
   border: none;
   border-radius: 3rem;
   font-size: 0.95rem;
@@ -474,6 +473,7 @@
   box-shadow: 0 6px 20px rgba(13, 47, 110, 0.3);
   transition: transform 0.2s ease, box-shadow 0.2s ease;
   letter-spacing: 0.3px;
+  white-space: nowrap;
 }
 
 .session-fab:active {

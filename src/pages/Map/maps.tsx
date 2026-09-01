@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { IonPage, IonIcon, IonSpinner } from '@ionic/react';
+import { IonPage, IonIcon } from '@ionic/react';
 import {
   arrowBack,
   close,
@@ -11,7 +11,7 @@ import {
 import { useHistory, useLocation } from 'react-router-dom';
 import './maps.css';
 
-import { LoadScript, GoogleMap, MarkerF, InfoWindow } from '@react-google-maps/api';
+import { GoogleMap, MarkerF, InfoWindow, useJsApiLoader } from '@react-google-maps/api';
 
 import { fetchDestinationById, fetchDestinations } from '../../services/destinationService';
 import { useUserLocation } from '../../services/useUserLocation';
@@ -42,6 +42,10 @@ const MapPage: React.FC<{ destinationId?: string }> = ({ destinationId }) => {
   const history = useHistory();
   const routerLocation = useLocation();
   const { coords } = useUserLocation();
+  const { isLoaded: mapsLoaded } = useJsApiLoader({
+    id: 'catour-google-maps',
+    googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY,
+  });
 
   const mapRef = useRef<google.maps.Map | null>(null);
   const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number }>({ lat: 14.5995, lng: 120.9842 });
@@ -159,7 +163,10 @@ const MapPage: React.FC<{ destinationId?: string }> = ({ destinationId }) => {
       const target = focusedIndex >= 0
         ? displayedList[focusedIndex]
         : displayedList[0];
-      if (target) flyToDestination(target);
+      if (target) {
+        flyToDestination(target);
+        history.push(`/destination/${target.id}`, target);
+      }
       return;
     }
   };
@@ -278,6 +285,11 @@ const MapPage: React.FC<{ destinationId?: string }> = ({ destinationId }) => {
   const handleGoClick = (dest: Destination) =>
     history.push(`/destination/${dest.id}`, dest);
 
+  const handleResultSelect = (dest: Destination) => {
+    flyToDestination(dest);
+    history.push(`/destination/${dest.id}`, dest);
+  };
+
   const clearSearch = () => {
     if (blurTimerRef.current) clearTimeout(blurTimerRef.current);
     setSearchQuery('');
@@ -343,16 +355,7 @@ const MapPage: React.FC<{ destinationId?: string }> = ({ destinationId }) => {
       <div className="map-page-wrapper">
 
           <div className="map-container">
-            <LoadScript
-              googleMapsApiKey={import.meta.env.VITE_GOOGLE_MAPS_API_KEY}
-              loadingElement={
-                <div className="map-loading">
-                  <IonSpinner name="crescent" />
-                  <p>Loading map...</p>
-                </div>
-              }
-              onError={() => setMapLoadError(true)}
-            >
+            {mapsLoaded && (
               <GoogleMap
                 mapContainerStyle={{ height: '100%', width: '100%' }}
                 center={mapCenter}
@@ -414,7 +417,7 @@ const MapPage: React.FC<{ destinationId?: string }> = ({ destinationId }) => {
 
                 
               </GoogleMap>
-            </LoadScript>
+            )}
             {mapLoadError && !mapReady && (
               <div className="map-loading map-load-error">
                 <p>Map unavailable on this connection.</p>
@@ -511,7 +514,7 @@ const MapPage: React.FC<{ destinationId?: string }> = ({ destinationId }) => {
                       aria-selected={focusedIndex === idx}
                       className={`result-item ${focusedIndex === idx ? 'keyboard-focus' : ''} ${selectedDest?.id === dest.id ? 'active' : ''}`}
                       onMouseEnter={() => setFocusedIndex(idx)}
-                      onClick={() => flyToDestination(dest)}
+                      onClick={() => handleResultSelect(dest)}
                     >
                       <div className="result-pin-icon">
                         <IonIcon icon={locationOutline} />

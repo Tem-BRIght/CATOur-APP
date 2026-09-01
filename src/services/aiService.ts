@@ -16,6 +16,7 @@ import { Destination } from '../types';
 import { haversineKm } from './distance';
 import { getWalkingRoute, describeRouteForPrompt } from './routingService';
 import { getCurrentWeather, describeWeatherForPrompt } from './weatherService';
+import { CATOUR_APP_GUIDE } from './catourAppGuide';
 
 // ── Config ────────────────────────────────────────────────────────────────────
 
@@ -107,6 +108,8 @@ export interface AskAIGuideParams {
 const SYSTEM_PROMPT = `
 You are ALI, the official AI Tour Guide for the CATOUR app in Pasig City, Philippines.
 You assist signed-in tourists who are actively exploring destinations in Pasig City.
+
+${CATOUR_APP_GUIDE}
 
 Response Style:
 - Always answer in complete, well-formed sentences. Never send sentence fragments or placeholder text.
@@ -277,6 +280,55 @@ function getRequestedRecommendationIds(message: string, ranked: RankedDestinatio
   });
 
   return ordered.slice(0, MAX_RECOMMENDATIONS).map(({ dest }) => dest.id);
+}
+
+export function parseRouteIntent(
+  message: string,
+  destinations: Destination[],
+): { originId?: string; destinationId?: string } | null {
+  const text = message.trim();
+  if (!text) return null;
+
+  const lower = text.toLowerCase();
+  const candidateNames = destinations
+    .map(dest => {
+      const value = dest as any;
+      const title = typeof value.title === 'string' ? value.title : '';
+      const name = typeof value.name === 'string' ? value.name : '';
+      return { id: dest.id, title: title.trim(), name: name.trim() };
+    })
+    .filter(item => item.title || item.name)
+    .sort((a, b) => (b.title.length + b.name.length) - (a.title.length + a.name.length));
+
+  const findMatch = (): string | null => {
+    for (const item of candidateNames) {
+      const names = [item.title, item.name].filter(Boolean).map(value => value.toLowerCase());
+      if (names.some(name => lower.includes(name))) {
+        return item.id;
+      }
+    }
+    return null;
+  };
+
+  const originId = (() => {
+    const prefixMatch = lower.match(/(?:from|starting from|start from|begin from|leave from)\s+(.+?)(?:\s+to\s+|$)/i);
+    if (prefixMatch?.[1]) {
+      const phrase = prefixMatch[1].trim();
+      for (const item of candidateNames) {
+        const combined = [item.title, item.name].filter(Boolean).join(' ').toLowerCase();
+        if (combined.includes(phrase) || phrase.includes(combined)) return item.id;
+      }
+    }
+    return null;
+  })();
+
+  const destinationId = findMatch();
+  if (!destinationId && !originId) return null;
+
+  return {
+    ...(originId ? { originId } : {}),
+    ...(destinationId && destinationId !== originId ? { destinationId } : {}),
+  };
 }
 
 // ── Per-user history (searches + visited places) ─────────────────────────────
@@ -701,6 +753,16 @@ function generateSmartLocalFallback(
     };
   }
 
+  if (MAP_INTENT.test(message)) {
+    return {
+      reply: showRouteToId
+        ? 'I can show the route on the map. Tap "View route on map" below, or open Maps from the Home screen.'
+        : 'Yes, CATOUR has a Maps button. From Home, tap the map or location button to open Maps, or tell me which Pasig destination you want a route to.',
+      recommendedDestinationIds: showRouteToId ? [showRouteToId] : topIds,
+      showRouteToId,
+    };
+  }
+
   // 4. Logistics / Hours / Fees
   if (LOGISTICS_INTENT.test(message)) {
     if (topSpots.length > 0) {
@@ -791,7 +853,7 @@ export async function askAIGuide(params: AskAIGuideParams): Promise<AIGuideRespo
         showRouteToId = candidate.id;
       }
     } else {
-      contextLines.push('The tourist asked for directions or a map but did not identify a destination. Ask one short clarifying question; do not choose a place or show a route.');
+      contextLines.push('The tourist asked about a map but did not identify a destination. Tell them CATOUR can show maps: they can tap the map/location button on Home, or name a Pasig destination so you can show its route. Never say that CATOUR cannot show a map.');
     }
   }
 

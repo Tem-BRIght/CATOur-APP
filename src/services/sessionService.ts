@@ -47,6 +47,15 @@ function isPermissionDeniedError(error: unknown): boolean {
     || message.includes('insufficient permissions');
 }
 
+function getCancelledUserIds(slot: any, uid?: string): string[] {
+  const ids = [
+    ...(Array.isArray(slot?.cancelledUserIds) ? slot.cancelledUserIds : []),
+    ...(Array.isArray(slot?.cancelledUids) ? slot.cancelledUids : []),
+  ];
+  if (uid) return ids.filter((id) => id === uid);
+  return ids;
+}
+
 async function getSessionProfile(uid: string) {
   try {
     return await getUserProfile(uid);
@@ -74,6 +83,8 @@ export interface Tourist {
   address?: string;
   age?: number | string;
   birthMonth?: string;
+  photoUrl?: string;
+  img?: string;
 }
 
 export interface VisitedStop {
@@ -142,7 +153,7 @@ async function enrichGuideProfile(session: TourSession): Promise<TourSession> {
 
   try {
     const guideSnap = await getDoc(doc(firestore, 'tourGuides', session.guideId));
-    if (guideSnap.exists()) {
+    if (guideSnap && guideSnap.exists && guideSnap.exists()) {
       const guideProfile = guideSnap.data() as TourGuideProfile;
       session.guideProfile = guideProfile;
       session.guidePhotoUrl = guideProfile.photoUrl || guideProfile.img || session.guidePhotoUrl;
@@ -183,6 +194,43 @@ export async function generateSequentialTourId(): Promise<string> {
   const secondGroup = padded.slice(4);
 
   return `TOUR-${year}-${firstGroup}-${secondGroup}`;
+}
+
+export function buildSessionSlotKey(guideId: string, date: string, startTime: string): string {
+  return `${guideId}::${date}::${startTime}`.trim().toLowerCase();
+}
+
+export function resolveSessionForGuideSlot(
+  guideId: string,
+  slot: {
+    date?: string;
+    startTime?: string;
+    sessionId?: string;
+    slotKey?: string;
+  },
+  sessions: Array<{
+    id: string;
+    guideId?: string;
+    slotKey?: string;
+    rawStatus?: string;
+  }>,
+): { id: string; guideId?: string; slotKey?: string; rawStatus?: string } | null {
+  if (slot.sessionId) {
+    const directMatch = sessions.find((session) => session.id === slot.sessionId && session.guideId === guideId);
+    if (directMatch) return directMatch;
+  }
+
+  if (slot.date && slot.startTime) {
+    const expectedSlotKey = buildSessionSlotKey(guideId, slot.date, slot.startTime);
+    const exactMatch = sessions.find((session) => {
+      if (session.guideId !== guideId) return false;
+      if (session.rawStatus === 'Cancelled') return false;
+      return (session.slotKey || '').trim().toLowerCase() === expectedSlotKey;
+    });
+    if (exactMatch) return exactMatch;
+  }
+
+  return null;
 }
 
 // ── Write operations ─────────────────────────────────────────────────────────
@@ -261,51 +309,109 @@ export async function getOrCreateSessionForSlot(params: {
   if (endDate <= startDate) endDate.setDate(endDate.getDate() + 1);
   const startISO = startDate.toISOString();
   const endISO = endDate.toISOString();
+  const slotKey = buildSessionSlotKey(guideId, date, startTime);
 
-  // Look for an existing session for this exact guide + slot start time.
-  const existingSnap = await getDocs(
-    query(sessionsCol(), where('guideId', '==', guideId), where('startTime', '==', startISO))
-  );
+  const slotLockRef = doc(firestore, 'sessionSlotLocks', slotKey);
 
-  const existingDoc = existingSnap.docs.find((candidate) => (
-    (candidate.data() as Partial<TourSession>).status !== 'Cancelled'
-  ));
+  const existingSession = await runTransaction(firestore, async (transaction) => {
+    const lockSnap = await transaction.get(slotLockRef);
+    if (lockSnap.exists()) {
+      const lockedSessionId = String((lockSnap.data() as any)?.sessionId || '');
+      if (lockedSessionId) {
+        const existingRef = doc(firestore, 'sessions', lockedSessionId);
+        const existingSnap = await transaction.get(existingRef);
+        if (existingSnap.exists()) {
+          return { id: existingSnap.id, ...existingSnap.data() } as TourSession;
+        }
+      }
+    }
 
-  if (existingDoc) {
-    const existingSession = { id: existingDoc.id, ...existingDoc.data() } as TourSession;
-    // CHANGED: keep the admin "Tour Guide Scheduling" booking row in sync
-    // even when re-generating for the SAME slot (Refresh QR, remount, etc).
-    void upsertBookingRecord(existingSession);
-    return existingSession;
+    const counterRef = counterDoc(new Date().getFullYear());
+    const counterSnap = await transaction.get(counterRef);
+    const currentCount = counterSnap.exists() ? (counterSnap.data().count as number) || 0 : 0;
+    const nextNumber = currentCount + 1;
+    transaction.set(counterRef, { count: nextNumber }, { merge: true });
+
+    const padded = String(nextNumber).padStart(8, '0');
+    const firstGroup = padded.slice(0, 4);
+    const secondGroup = padded.slice(4);
+    const nextId = `TOUR-${new Date().getFullYear()}-${firstGroup}-${secondGroup}`;
+
+    const ref = sessionDoc(nextId);
+    const sessionData = {
+      destinationId,
+      destinationName,
+      tourTypeId: tourTypeId || '',
+      tourTypeName: tourTypeName || '',
+      guideId,
+      guideName,
+      slotKey,
+      startTime: startISO,
+      endTime: endISO,
+      tourists: initialTourist ? [{ ...initialTourist, status: 'Joined' as const }] : [],
+      touristUids: initialTourist ? [initialTourist.uid] : [],
+      checkedInUids: [],
+      status: 'pending',
+      createdAt: new Date().toISOString(),
+    };
+
+    transaction.set(ref, sessionData);
+    transaction.set(slotLockRef, { sessionId: nextId, guideId, date, startTime, createdAt: serverTimestamp() }, { merge: true });
+    return { id: nextId, ...sessionData } as TourSession;
+  });
+
+  if (initialTourist) {
+    const hasActiveInitialTourist = Array.isArray(existingSession.tourists)
+      ? existingSession.tourists.some((tourist) => tourist.uid === initialTourist.uid && tourist.status !== 'Cancelled')
+      : Array.isArray(existingSession.touristUids) && existingSession.touristUids.includes(initialTourist.uid);
+
+    if (hasActiveInitialTourist) {
+      void upsertBookingRecord(existingSession);
+      return existingSession;
+    }
   }
 
-  const id = await generateSequentialTourId();
-  const ref = sessionDoc(id);
+  void upsertBookingRecord(existingSession);
+  return existingSession;
+}
 
-  const sessionData = {
-    destinationId,
-    destinationName,
-    tourTypeId: tourTypeId || '',
-    tourTypeName: tourTypeName || '',
-    guideId,
-    guideName,
-    startTime: startISO,
-    endTime: endISO,
-    tourists: initialTourist ? [{ ...initialTourist, status: 'Joined' as const }] : [],
-    touristUids: initialTourist ? [initialTourist.uid] : [],
-    checkedInUids: [],
-    status: 'pending',
-    createdAt: new Date().toISOString(),
-  };
+/**
+ * updateSlotWithSessionId
+ * Links a session back to the guide's availabilitySlot by storing the sessionId.
+ * This ensures admin can find the session when viewing the Tour Available Slots table.
+ */
+export async function updateSlotWithSessionId(
+  guideId: string,
+  date: string,
+  startTime: string,
+  sessionId: string
+): Promise<void> {
+  try {
+    const guideRef = doc(firestore, 'tourGuides', guideId);
+    await runTransaction(firestore, async (transaction) => {
+      const guideSnap = await transaction.get(guideRef);
+      if (!guideSnap.exists()) throw new Error('Guide not found');
 
-  await setDoc(ref, sessionData);
-  const newSession = { id, ...sessionData } as TourSession;
-  // CHANGED: this is the "mapupunta sa Tour Guide Scheduling" hookup —
-  // Tour Type + Date + Time picked in GenerateQR.tsx now creates/updates a
-  // matching row on the Admin's Tour Guide Scheduling table, using the same
-  // TOUR-YYYY-####-#### ID as both the session doc ID and the booking doc ID.
-  void upsertBookingRecord(newSession);
-  return newSession;
+      const slots = Array.isArray(guideSnap.data()['availabilitySlots'])
+        ? [...guideSnap.data()['availabilitySlots']]
+        : [];
+
+      const slotIndex = slots.findIndex(
+        (s: any) => s.date === date && s.startTime === startTime
+      );
+
+      if (slotIndex === -1) {
+        console.warn(`[updateSlotWithSessionId] Slot not found: ${date} ${startTime}`);
+        return;
+      }
+
+      slots[slotIndex].sessionId = sessionId;
+      transaction.update(guideRef, { availabilitySlots: slots });
+      console.log(`[updateSlotWithSessionId] Linked session ${sessionId} to slot ${date} ${startTime}`);
+    });
+  } catch (err) {
+    console.error('[updateSlotWithSessionId] failed:', err);
+  }
 }
 
 // ── Admin sync: Tour Guide Scheduling ────────────────────────────────────────
@@ -389,7 +495,7 @@ function getAgeFromBirthDate(dateString: string): number | '' {
 }
 
 export function hydrateTouristProfile(
-  tourist: Partial<Tourist> & { uid?: string },
+  tourist: Partial<Tourist>,
   profile: Partial<any> | null | undefined
 ): Tourist {
   const birthDate = tourist.dateOfBirth || profile?.dateOfBirth || '';
@@ -404,9 +510,11 @@ export function hydrateTouristProfile(
     name: tourist.name || profile?.name?.firstname || profile?.displayName || '',
     email: tourist.email || profile?.email || '',
     joinedAt: tourist.joinedAt || new Date().toISOString(),
-    status: tourist.status,
-    cancelledAt: tourist.cancelledAt,
-    cancelReason: tourist.cancelReason,
+    status: tourist.status || 'Joined',
+    ...(tourist.cancelledAt && { cancelledAt: tourist.cancelledAt }),
+    ...(tourist.cancelReason && { cancelReason: tourist.cancelReason }),
+    ...(tourist.photoUrl || profile?.photoUrl || profile?.img ? { photoUrl: tourist.photoUrl || profile?.photoUrl || profile?.img } : {}),
+    ...(tourist.img || profile?.img ? { img: tourist.img || profile?.img } : {}),
     gender: tourist.gender || profile?.gender || '',
     nationality: tourist.nationality || profile?.nationality || '',
     religion: tourist.religion || profile?.religion || '',
@@ -417,22 +525,63 @@ export function hydrateTouristProfile(
   };
 }
 
+export function sanitizeGuideVisibleTourist(tourist: Partial<Tourist> | null | undefined): Partial<Tourist> | null {
+  if (!tourist) return null;
+
+  const sanitized: Partial<Tourist> = {
+    uid: tourist.uid || '',
+    name: tourist.name || '',
+    email: tourist.email || '',
+    joinedAt: tourist.joinedAt || new Date().toISOString(),
+    status: tourist.status,
+  };
+
+  if (tourist.photoUrl) sanitized.photoUrl = tourist.photoUrl;
+  if (tourist.img) sanitized.img = tourist.img;
+  if (tourist.cancelledAt) sanitized.cancelledAt = tourist.cancelledAt;
+  if (tourist.cancelReason) sanitized.cancelReason = tourist.cancelReason;
+
+  return sanitized;
+}
+
 export async function addTouristToSession(
   sessionId: string,
   tourist: Tourist
 ): Promise<Tourist[]> {
   const ref = sessionDoc(sessionId);
-  const snap = await getDoc(ref);
-  if (!snap.exists()) throw new Error('Session not found');
+  let snap = await getDoc(ref);
+
+  if (!snap || !snap.exists || !snap.exists()) {
+    const hydratedTourist = hydrateTouristProfile(tourist, null);
+    hydratedTourist.status = 'Joined';
+    const fallbackSession = {
+      id: sessionId,
+      destinationId: '',
+      destinationName: '',
+      guideId: '',
+      guideName: '',
+      startTime: new Date().toISOString(),
+      tourists: [hydratedTourist],
+      touristUids: [hydratedTourist.uid],
+      checkedInUids: [],
+      status: 'pending',
+      createdAt: new Date().toISOString(),
+    } as TourSession;
+    await setDoc(ref, fallbackSession, { merge: true });
+    snap = await getDoc(ref);
+  }
+
+  if (!snap || !snap.exists || !snap.exists()) throw new Error('Session not found');
 
   const data = snap.data() as TourSession;
-  const currentTourists = data.tourists || [];
+  const currentTourists: Tourist[] = data.tourists || [];
   const profile = tourist.uid ? await getSessionProfile(tourist.uid) : null;
   const hydratedTourist = hydrateTouristProfile(tourist, profile);
   hydratedTourist.status = 'Joined';
 
-  // Check if already in the list
-  const existingTourist = currentTourists.find(t => t.uid === hydratedTourist.uid);
+  // Guard against accidental duplicate writes from quick repeated taps or a
+  // session-create + join-sync path that writes the same tourist twice.
+  const existingTourist = currentTourists.find((t) => t.uid === hydratedTourist.uid);
   if (existingTourist && existingTourist.status !== 'Cancelled') {
     const enriched = await Promise.all(currentTourists.map(async (t) => {
       const profile = t.uid ? await getSessionProfile(t.uid) : null;
@@ -449,8 +598,16 @@ export async function addTouristToSession(
   // the same write so the two arrays never drift apart — it's what
   // getUserJoinedSessions() queries against.
   try {
+    // Sanitize Tourist object: remove undefined fields to prevent Firestore arrayUnion error
+    const sanitized: Record<string, any> = {};
+    (Object.entries(hydratedTourist) as [string, any][]).forEach(([key, value]) => {
+      if (value !== undefined) {
+        sanitized[key] = value;
+      }
+    });
+
     const update: Record<string, unknown> = {
-      tourists: arrayUnion(hydratedTourist),
+      tourists: arrayUnion(sanitized),
       touristUids: arrayUnion(hydratedTourist.uid),
     };
     if (existingTourist?.status === 'Cancelled') {
@@ -470,7 +627,12 @@ export async function addTouristToSession(
   // Keep the admin booking row's tourist count current.
   void upsertBookingRecord({ ...data, id: sessionId, tourists: updatedTourists });
 
-  return updatedTourists;
+  // Return enriched list with profiles hydrated
+  const enriched = await Promise.all(updatedTourists.map(async (t) => {
+    const profile = t.uid ? await getSessionProfile(t.uid) : null;
+    return hydrateTouristProfile(t, profile);
+  }));
+  return enriched;
 }
 
 export async function checkInTouristToSession(
@@ -488,8 +650,19 @@ export async function checkInTouristToSession(
     if (session.status === 'ended' || session.status === 'Cancelled') {
       throw new Error('This tour session is no longer active.');
     }
-    if (!Array.isArray(session.touristUids) || !session.touristUids.includes(userId)
-      || session.cancelledUids?.includes(userId)) {
+
+    const sessionTourists = Array.isArray(session.tourists) ? session.tourists : [];
+    const activeRegistration = sessionTourists.find(
+      (tourist) => tourist.uid === userId && tourist.status !== 'Cancelled'
+    );
+
+    // A raw UID in touristUids is not enough if the only matching roster entry is
+    // cancelled. That would allow a stale registration record to check in.
+    const isRegisteredByUid = Array.isArray(session.touristUids)
+      ? session.touristUids.includes(userId) && !!activeRegistration
+      : !!activeRegistration;
+
+    if (!activeRegistration && !isRegisteredByUid) {
       throw new Error('You are not registered for this tour session.');
     }
 
@@ -497,7 +670,7 @@ export async function checkInTouristToSession(
     if (!checkedInUids.includes(userId)) {
       transaction.update(ref, {
         checkedInUids: [...checkedInUids, userId],
-        tourists: (session.tourists || []).map((tourist) => tourist.uid === userId && tourist.status !== 'Cancelled'
+        tourists: sessionTourists.map((tourist) => tourist.uid === userId && tourist.status !== 'Cancelled'
           ? { ...tourist, status: 'Checked-In' as const }
           : tourist),
       });
@@ -595,6 +768,33 @@ export async function cancelSession(sessionId: string, reason?: string): Promise
   await updateSessionStatus(sessionId, 'Cancelled', reason);
 }
 
+function resolveSessionRegistration(sessionId: string): {
+  actualSessionId: string;
+  userId?: string;
+  joinedAt?: string;
+} {
+  const firstCompositeIndex = sessionId.indexOf('__');
+  if (firstCompositeIndex <= 0) {
+    return { actualSessionId: sessionId };
+  }
+
+  const remainder = sessionId.slice(firstCompositeIndex + 2);
+  const secondCompositeIndex = remainder.indexOf('__');
+
+  if (secondCompositeIndex <= 0) {
+    return { actualSessionId: sessionId.slice(0, firstCompositeIndex) };
+  }
+
+  const registrationUserId = remainder.slice(0, secondCompositeIndex);
+  const registrationJoinedAt = remainder.slice(secondCompositeIndex + 2);
+
+  return {
+    actualSessionId: sessionId.slice(0, firstCompositeIndex),
+    userId: registrationUserId || undefined,
+    joinedAt: registrationJoinedAt || undefined,
+  };
+}
+
 export async function cancelJoinedSession(
   sessionId: string,
   userId: string,
@@ -602,6 +802,9 @@ export async function cancelJoinedSession(
 ): Promise<void> {
   const trimmedReason = reason.trim();
   if (!trimmedReason) throw new Error('Please provide a valid reason for cancelling this tour.');
+
+  const resolved = resolveSessionRegistration(sessionId);
+  const actualSessionId = resolved.actualSessionId || sessionId;
 
   await runTransaction(firestore, async (transaction) => {
     let guideId = '';
@@ -616,7 +819,7 @@ export async function cancelJoinedSession(
       sessionDate = parts[2] || '';
       sessionStartTime = parts[3] || '';
     } else {
-      sessionRef = sessionDoc(sessionId);
+      sessionRef = sessionDoc(actualSessionId);
       const sessionSnap = await transaction.get(sessionRef);
       if (sessionSnap.exists()) {
         session = sessionSnap.data() as TourSession;
@@ -624,62 +827,88 @@ export async function cancelJoinedSession(
       }
     }
 
-    if (!guideId) throw new Error('Tour guide not found');
-
-    const guideRef = doc(firestore, 'tourGuides', guideId);
+    const guideRef = guideId ? doc(firestore, 'tourGuides', guideId) : null;
     if (session && session.status !== 'pending') {
       throw new Error('This tour can only be cancelled before it starts.');
     }
     const tourists = session?.tourists || [];
-    const tourist = tourists.find((item) => item.uid === userId);
+    const registrationKey = resolved.joinedAt || null;
+    const activeRegistrations = tourists.filter((item) => item.uid === userId && item.status !== 'Cancelled');
+    const tourist = activeRegistrations.find((item) => !registrationKey || item.joinedAt === registrationKey)
+      || activeRegistrations[activeRegistrations.length - 1];
     if (session && (!session.touristUids?.includes(userId) || !tourist)) {
       throw new Error('You are not joined to this tour.');
     }
     if (session && (session.checkedInUids?.includes(userId) || tourist?.status === 'Checked-In')) {
       throw new Error('This tour cannot be cancelled after check-in.');
     }
-    const guideSnap = await transaction.get(guideRef);
-    if (!guideSnap.exists()) throw new Error('Tour guide not found');
 
-    const slots = Array.isArray(guideSnap.data().availabilitySlots)
-      ? [...guideSnap.data().availabilitySlots]
-      : [];
-    let slotIndex = -1;
-    if (session?.startTime) {
-      const sessionStart = new Date(session.startTime).getTime();
-      slotIndex = slots.findIndex((slot: any) =>
-        new Date(`${slot.date}T${slot.startTime}:00`).getTime() === sessionStart
-      );
-    }
-    if (slotIndex < 0 && sessionDate && sessionStartTime) {
-      slotIndex = slots.findIndex((slot: any) =>
-        slot.date === sessionDate && slot.startTime === sessionStartTime
-      );
-    }
-    if (slotIndex < 0) {
-      slotIndex = slots.findIndex((slot: any) =>
-        Array.isArray(slot.joinedUserIds) && slot.joinedUserIds.includes(userId)
-      );
-    }
+    if (guideRef) {
+      const guideSnap = await transaction.get(guideRef);
+      if (guideSnap.exists()) {
+        const slots = Array.isArray(guideSnap.data().availabilitySlots)
+          ? [...guideSnap.data().availabilitySlots]
+          : [];
+        let slotIndex = -1;
+        if (session?.startTime) {
+          const sessionStart = new Date(session.startTime).getTime();
+          slotIndex = slots.findIndex((slot: any) =>
+            new Date(`${slot.date}T${slot.startTime}:00`).getTime() === sessionStart
+          );
+        }
+        if (slotIndex < 0 && sessionDate && sessionStartTime) {
+          slotIndex = slots.findIndex((slot: any) =>
+            slot.date === sessionDate && slot.startTime === sessionStartTime
+          );
+        }
+        if (slotIndex < 0) {
+          slotIndex = slots.findIndex((slot: any) =>
+            Array.isArray(slot.joinedUserIds) && slot.joinedUserIds.includes(userId)
+          );
+        }
 
-    if (slotIndex >= 0) {
-      const slot = { ...slots[slotIndex] };
-      const previousBookedCount = Number(slot.bookedCount ?? slot.sessionCount ?? 0);
-      const previousSessionCount = Number(slot.sessionCount ?? previousBookedCount);
-      const hadSlotRegistration = (Array.isArray(slot.joinedUserIds) ? slot.joinedUserIds : [])
-        .includes(userId);
-      slot.joinedUserIds = (Array.isArray(slot.joinedUserIds) ? slot.joinedUserIds : [])
-        .filter((id: string) => id !== userId);
-      slot.bookedCount = Math.max(0, previousBookedCount - (hadSlotRegistration ? 1 : 0));
-      slot.sessionCount = Math.max(0, previousSessionCount - (hadSlotRegistration ? 1 : 0));
-      slots[slotIndex] = slot;
-      transaction.update(guideRef, { availabilitySlots: slots });
+        if (slotIndex >= 0) {
+          const slot = { ...slots[slotIndex] };
+          const previousBookedCount = Number(slot.bookedCount ?? slot.sessionCount ?? 0);
+          const previousSessionCount = Number(slot.sessionCount ?? previousBookedCount);
+          const hadSlotRegistration = (Array.isArray(slot.joinedUserIds) ? slot.joinedUserIds : [])
+            .includes(userId);
+          const nextCancelledUids = Array.from(new Set([
+            ...(Array.isArray(slot.cancelledUids) ? slot.cancelledUids : []),
+            ...(Array.isArray(slot.cancelledUserIds) ? slot.cancelledUserIds : []),
+            userId,
+          ]));
+
+          slot.joinedUserIds = (Array.isArray(slot.joinedUserIds) ? slot.joinedUserIds : [])
+            .filter((id: string) => id !== userId);
+          slot.cancelledUids = nextCancelledUids;
+          slot.cancelledUserIds = nextCancelledUids;
+          slot.cancelReason = trimmedReason;
+          slot.cancelledAt = new Date().toISOString();
+          slot.bookedCount = Math.max(0, previousBookedCount - (hadSlotRegistration ? 1 : 0));
+          slot.sessionCount = Math.max(0, previousSessionCount - (hadSlotRegistration ? 1 : 0));
+          slots[slotIndex] = slot;
+          transaction.update(guideRef, { availabilitySlots: slots });
+        }
+      }
     }
 
     if (session && sessionRef) {
       const tourists = Array.isArray(session.tourists) ? session.tourists : [];
+      const activeRegistrations = tourists.filter((item) => item.uid === userId && item.status !== 'Cancelled');
+      const matchingRegistrations = registrationKey
+        ? activeRegistrations.filter((item) => item.joinedAt === registrationKey)
+        : activeRegistrations;
+      const registrationsToCancel = matchingRegistrations.length > 0
+        ? matchingRegistrations
+        : activeRegistrations;
+      const targetRegistration = registrationsToCancel[registrationsToCancel.length - 1] || null;
       transaction.update(sessionRef, {
-        tourists: tourists.map((item) => item.uid === userId
+        tourists: tourists.map((item) => item.uid === userId && item.status !== 'Cancelled' && (
+          registrationKey
+            ? item.joinedAt === registrationKey || activeRegistrations.length > 1
+            : true
+        )
           ? {
               ...item,
               status: 'Cancelled',
@@ -690,6 +919,10 @@ export async function cancelJoinedSession(
         touristUids: session.touristUids || [],
         cancelledUids: arrayUnion(userId),
         checkedInUids: (session.checkedInUids || []).filter((id) => id !== userId),
+        // If the same tourist was duplicated by a stale or retried join, cancel
+        // every active registration for that uid so the session no longer looks
+        // joined in the history list or conflict checks.
+        ...(targetRegistration ? { updatedAt: new Date().toISOString() } : {}),
       });
     }
   });
@@ -699,7 +932,7 @@ export async function cancelJoinedSession(
     type: 'cancel_confirmed',
     title: 'Tour cancelled',
     message: 'Your tour registration has been cancelled and the slot is available again.',
-    sessionId,
+    sessionId: actualSessionId,
   });
 }
 
@@ -757,7 +990,7 @@ export async function markStopVisited(sessionId: string, stopId: string): Promis
         visitorId: tourist.uid,
         destinationId: stopId,
         destinationTop: visitedStop.destinationName,
-        scannedAt: visitedStop.visitedAt,
+        markedAsVisitAt: visitedStop.visitedAt,
         visitSource: 'tour-session',
       },
       { merge: true }
@@ -906,56 +1139,137 @@ export function buildJoinedSessionFallbacks(
     endTime?: string;
     date: string;
     joinedUserIds?: string[];
+    cancelledUserIds?: string[];
+    cancelledUids?: string[];
+    cancelReason?: string;
+    cancelledAt?: string;
   }>
 ): TourSession[] {
-  const sessionMap = new Map<string, TourSession>();
+  const joinedResults: TourSession[] = [];
+  const cancelledResults: TourSession[] = [];
+  const seenIds = new Set<string>();
 
   sessions.forEach((session) => {
     const hasUidInFlatList = Array.isArray(session.touristUids) && session.touristUids.includes(uid);
     const hasUidInTouristsList = Array.isArray(session.tourists) && session.tourists.some((tourist) => tourist.uid === uid);
 
-    if (hasUidInFlatList || hasUidInTouristsList) {
-      sessionMap.set(session.id, session);
+    if (!hasUidInFlatList && !hasUidInTouristsList) return;
+
+    const userTourists = (session.tourists || []).filter((tourist) => tourist.uid === uid);
+    if (userTourists.length === 0) {
+      if (!seenIds.has(session.id)) {
+        seenIds.add(session.id);
+        joinedResults.push(session);
+      }
+      return;
     }
+
+    userTourists.forEach((tourist) => {
+      const isCancelled = tourist.status === 'Cancelled' || session.cancelledUids?.includes(uid);
+      const identityStamp = isCancelled
+        ? (tourist.cancelledAt || session.cancelledAt || tourist.joinedAt || new Date().toISOString())
+        : (tourist.joinedAt || session.createdAt || new Date().toISOString());
+      const rowId = `${session.id}__${uid}__${isCancelled ? 'cancelled' : 'joined'}__${identityStamp}`;
+
+      if (seenIds.has(rowId)) return;
+      seenIds.add(rowId);
+
+      const record: TourSession = {
+        ...session,
+        id: rowId,
+        tourists: [tourist],
+        touristUids: [tourist.uid],
+        status: isCancelled ? 'Cancelled' : session.status,
+        cancelReason: tourist.cancelReason || session.cancelReason || 'Cancelled by user',
+        cancelledAt: tourist.cancelledAt || session.cancelledAt || undefined,
+      };
+
+      if (isCancelled) {
+        cancelledResults.push(record);
+      } else {
+        joinedResults.push(record);
+      }
+    });
   });
 
   guideSlots.forEach((slot) => {
-    if (!Array.isArray(slot.joinedUserIds) || !slot.joinedUserIds.includes(uid)) return;
+    const joinedUserIds = Array.isArray(slot.joinedUserIds) ? slot.joinedUserIds : [];
+    const cancelledUserIds = getCancelledUserIds(slot, uid);
+    const isJoined = joinedUserIds.includes(uid);
+    const isCancelled = cancelledUserIds.length > 0;
+    if (!isJoined && !isCancelled) return;
 
-    const fallbackId = `slot:${slot.guideId}:${slot.date}:${slot.startTime}`;
-    const existing: TourSession | undefined = sessionMap.get(fallbackId);
+    const baseKey = `slot:${slot.guideId}:${slot.date}:${slot.startTime}`;
 
-    const merged: TourSession = existing
-      ? {
-          ...existing,
-          tourists: existing.tourists || [],
-          touristUids: Array.from(new Set([...(existing.touristUids || []), uid])),
-        }
-      : {
-          id: fallbackId,
-          destinationId: slot.destinationId,
-          destinationName: slot.destinationName,
-          guideId: slot.guideId,
-          guideName: slot.guideName,
-          guidePhotoUrl: slot.guidePhotoUrl,
-          startTime: normalizeSlotIsoValue(slot.date, slot.startTime),
-          endTime: normalizeSlotIsoValue(slot.date, slot.endTime),
-          tourists: [],
-          touristUids: [uid],
-          cancelledUids: [],
-          checkedInUids: [],
-          createdAt: new Date().toISOString(),
-          status: 'pending',
-          tourTypeId: slot.tourTypeId || '',
-          tourTypeName: slot.tourTypeName || 'Tour',
-        };
+    if (isCancelled) {
+      const cancelledAt = slot.cancelledAt || new Date().toISOString();
+      const cancelledId = `${baseKey}__cancelled__${uid}__${cancelledAt}`;
+      if (seenIds.has(cancelledId)) return;
+      seenIds.add(cancelledId);
+      cancelledResults.push({
+        id: cancelledId,
+        destinationId: slot.destinationId,
+        destinationName: slot.destinationName,
+        guideId: slot.guideId,
+        guideName: slot.guideName,
+        guidePhotoUrl: slot.guidePhotoUrl,
+        startTime: normalizeSlotIsoValue(slot.date, slot.startTime),
+        endTime: normalizeSlotIsoValue(slot.date, slot.endTime),
+        tourists: [{
+          uid,
+          name: 'Tourist',
+          email: '',
+          joinedAt: cancelledAt,
+          status: 'Cancelled',
+          cancelReason: slot.cancelReason || 'Cancelled by user',
+          cancelledAt,
+        }],
+        touristUids: [uid],
+        cancelledUids: [uid],
+        checkedInUids: [],
+        createdAt: new Date().toISOString(),
+        status: 'Cancelled',
+        cancelReason: slot.cancelReason || 'Cancelled by user',
+        cancelledAt,
+        tourTypeId: slot.tourTypeId || '',
+        tourTypeName: slot.tourTypeName || 'Tour',
+      });
+    }
 
-    if (!existing) {
-      sessionMap.set(fallbackId, merged);
+    if (isJoined) {
+      const joinedAt = new Date().toISOString();
+      const joinedId = `${baseKey}__joined__${uid}__${joinedAt}`;
+      if (seenIds.has(joinedId)) return;
+      seenIds.add(joinedId);
+      joinedResults.push({
+        id: joinedId,
+        destinationId: slot.destinationId,
+        destinationName: slot.destinationName,
+        guideId: slot.guideId,
+        guideName: slot.guideName,
+        guidePhotoUrl: slot.guidePhotoUrl,
+        startTime: normalizeSlotIsoValue(slot.date, slot.startTime),
+        endTime: normalizeSlotIsoValue(slot.date, slot.endTime),
+        tourists: [{
+          uid,
+          name: 'Tourist',
+          email: '',
+          joinedAt,
+          status: 'Joined',
+        }],
+        touristUids: [uid],
+        cancelledUids: [],
+        checkedInUids: [],
+        createdAt: new Date().toISOString(),
+        status: 'pending',
+        tourTypeId: slot.tourTypeId || '',
+        tourTypeName: slot.tourTypeName || 'Tour',
+      });
     }
   });
 
-  return Array.from(sessionMap.values()).sort((a, b) => {
+  const combined = [...joinedResults, ...cancelledResults];
+  return combined.sort((a, b) => {
     const aTime = a.startTime ? new Date(a.startTime).getTime() : 0;
     const bTime = b.startTime ? new Date(b.startTime).getTime() : 0;
     return bTime - aTime;
@@ -979,16 +1293,36 @@ export async function getUserJoinedSessions(uid: string): Promise<TourSession[]>
       ])
     );
 
-    const sessions = sessionsSnap.docs
-      .map((d) => {
-        const session = { id: d.id, ...d.data() } as TourSession;
-        return normalizeSessionForViewer({
-          ...session,
-          tourTypeName: session.tourTypeName || tourTypeNames.get(session.tourTypeId || '') || 'Tour',
-        }, uid);
-      });
+    const allSessions: TourSession[] = [];
+    sessionsSnap.docs.forEach((d) => {
+      const session = { id: d.id, ...d.data() } as TourSession;
+      session.tourTypeName = session.tourTypeName || tourTypeNames.get(session.tourTypeId || '') || 'Tour';
 
-    sessions.forEach((session) => {
+      // Flatten tourist registrations: each unique registration becomes a separate session entry
+      // This ensures cancel-then-rejoin creates two separate history items, not one
+      const userTourists = (session.tourists || []).filter((t) => t.uid === uid);
+      if (userTourists.length > 0) {
+        userTourists.forEach((tourist) => {
+          const isCancelled = tourist.status === 'Cancelled' || session.cancelledUids?.includes(uid);
+          const identityStamp = isCancelled
+            ? (tourist.cancelledAt || session.cancelledAt || tourist.joinedAt || new Date().toISOString())
+            : (tourist.joinedAt || session.createdAt || new Date().toISOString());
+          allSessions.push({
+            ...session,
+            // Keep the cancelled and joined registrations separate so React does not reuse the same card.
+            id: `${session.id}__${tourist.uid}__${isCancelled ? 'cancelled' : 'joined'}__${identityStamp}`,
+            tourists: [tourist],
+            touristUids: [tourist.uid],
+            // Cancellation must win over stale joined state when the user was removed from the slot list.
+            status: isCancelled ? 'Cancelled' : session.status,
+            cancelReason: tourist.cancelReason || session.cancelReason || 'Cancelled by user',
+            cancelledAt: tourist.cancelledAt || session.cancelledAt || new Date().toISOString(),
+          });
+        });
+      }
+    });
+
+    allSessions.forEach((session) => {
       const guideData = guidesSnap.docs.find((guideDoc) => guideDoc.id === session.guideId)?.data() as any;
       session.guidePhotoUrl = guideData?.photoUrl || guideData?.img || '';
     });
@@ -998,7 +1332,11 @@ export async function getUserJoinedSessions(uid: string): Promise<TourSession[]>
       const slots = Array.isArray(data.availabilitySlots) ? data.availabilitySlots : [];
 
       return slots
-        .filter((slot: any) => Array.isArray(slot.joinedUserIds) && slot.joinedUserIds.includes(uid))
+        .filter((slot: any) => {
+          const joined = Array.isArray(slot.joinedUserIds) && slot.joinedUserIds.includes(uid);
+          const cancelled = getCancelledUserIds(slot, uid).length > 0;
+          return joined || cancelled;
+        })
         .map((slot: any) => ({
           guideId: guideDoc.id,
           guideName: `${data.firstName || ''} ${data.lastName || ''}`.trim() || 'Unknown Guide',
@@ -1011,10 +1349,14 @@ export async function getUserJoinedSessions(uid: string): Promise<TourSession[]>
           endTime: slot.endTime || '',
           date: slot.date || '',
           joinedUserIds: slot.joinedUserIds || [],
+          cancelledUserIds: slot.cancelledUserIds || [],
+          cancelledUids: slot.cancelledUids || [],
+          cancelReason: slot.cancelReason || '',
+          cancelledAt: slot.cancelledAt || '',
         }));
     });
 
-    return buildJoinedSessionFallbacks(uid, sessions, guideSlots);
+    return buildJoinedSessionFallbacks(uid, allSessions, guideSlots);
   } catch (err) {
     console.error('[sessionService] getUserJoinedSessions failed:', err);
     return [];
@@ -1077,7 +1419,13 @@ export function subscribeSession(
       }
       onChange(session);
     },
-    (err) => console.error('[sessionService] subscribeSession error:', err)
+    (err) => {
+      if (isPermissionDeniedError(err)) {
+        void getSession(sessionId).then(onChange).catch(() => onChange(null));
+        return;
+      }
+      console.error('[sessionService] subscribeSession error:', err);
+    }
   );
 }
 
@@ -1103,17 +1451,38 @@ export function subscribeUserJoinedSessions(
     async (snap) => {
       const tourTypeNames = await tourTypeNamesPromise;
       const guidesSnap = await guidesPromise || await getDocs(collection(firestore, 'tourGuides')).catch(() => null);
-      const sessions = snap.docs
-        .map((item) => {
-          const session = { id: item.id, ...item.data() } as TourSession;
-          return normalizeSessionForViewer({
-            ...session,
-            tourTypeName: session.tourTypeName || tourTypeNames.get(session.tourTypeId || '') || 'Tour',
-          }, uid);
-        });
+      
+      // Flatten tourist registrations: each unique registration becomes a separate session entry
+      const allSessions: TourSession[] = [];
+      snap.docs.forEach((item) => {
+        const session = { id: item.id, ...item.data() } as TourSession;
+        session.tourTypeName = session.tourTypeName || tourTypeNames.get(session.tourTypeId || '') || 'Tour';
+        
+        // Create separate history entries for each registration
+        const userTourists = (session.tourists || []).filter((t) => t.uid === uid);
+        if (userTourists.length > 0) {
+          userTourists.forEach((tourist) => {
+            const isCancelled = tourist.status === 'Cancelled' || session.cancelledUids?.includes(uid);
+            const identityStamp = isCancelled
+              ? (tourist.cancelledAt || session.cancelledAt || tourist.joinedAt || new Date().toISOString())
+              : (tourist.joinedAt || session.createdAt || new Date().toISOString());
+            allSessions.push({
+              ...session,
+              // Keep the cancelled and joined registrations separate so React does not reuse the same card.
+              id: `${item.id}__${tourist.uid}__${isCancelled ? 'cancelled' : 'joined'}__${identityStamp}`,
+              tourists: [tourist],
+              touristUids: [tourist.uid],
+              // Cancellation must win over stale joined state when the user was removed from the slot list.
+              status: isCancelled ? 'Cancelled' : session.status,
+              cancelReason: tourist.cancelReason || session.cancelReason || 'Cancelled by user',
+              cancelledAt: tourist.cancelledAt || session.cancelledAt || new Date().toISOString(),
+            });
+          });
+        }
+      });
 
       if (guidesSnap) {
-        sessions.forEach((session) => {
+        allSessions.forEach((session) => {
           const guideData = guidesSnap.docs.find((guideDoc) => guideDoc.id === session.guideId)?.data() as any;
           if (guideData) {
             session.guidePhotoUrl = session.guidePhotoUrl || guideData.photoUrl || guideData.img || '';
@@ -1126,7 +1495,11 @@ export function subscribeUserJoinedSessions(
           const slots = Array.isArray(data.availabilitySlots) ? data.availabilitySlots : [];
 
           return slots
-            .filter((slot: any) => Array.isArray(slot.joinedUserIds) && slot.joinedUserIds.includes(uid))
+            .filter((slot: any) => {
+              const joined = Array.isArray(slot.joinedUserIds) && slot.joinedUserIds.includes(uid);
+              const cancelled = getCancelledUserIds(slot, uid).length > 0;
+              return joined || cancelled;
+            })
             .map((slot: any) => ({
               guideId: guideDoc.id,
               guideName: `${data.firstName || ''} ${data.lastName || ''}`.trim() || 'Unknown Guide',
@@ -1139,15 +1512,25 @@ export function subscribeUserJoinedSessions(
               endTime: slot.endTime || '',
               date: slot.date || '',
               joinedUserIds: slot.joinedUserIds || [],
+              cancelledUserIds: slot.cancelledUserIds || [],
+              cancelledUids: slot.cancelledUids || [],
+              cancelReason: slot.cancelReason || '',
+              cancelledAt: slot.cancelledAt || '',
             }));
         });
 
-        const merged = buildJoinedSessionFallbacks(uid, sessions, guideSlots);
+        const merged = buildJoinedSessionFallbacks(uid, allSessions, guideSlots);
         onChange(merged);
       } else {
-        onChange(sessions.sort((a, b) => new Date(b.startTime || 0).getTime() - new Date(a.startTime || 0).getTime()));
+        onChange(allSessions.sort((a: TourSession, b: TourSession) => new Date(b.startTime || 0).getTime() - new Date(a.startTime || 0).getTime()));
       }
     },
-    (err) => console.error('[sessionService] subscribeUserJoinedSessions error:', err),
+    (err) => {
+      if (isPermissionDeniedError(err)) {
+        void getUserJoinedSessions(uid).then(onChange).catch(() => onChange([]));
+        return;
+      }
+      console.error('[sessionService] subscribeUserJoinedSessions error:', err);
+    },
   );
 }

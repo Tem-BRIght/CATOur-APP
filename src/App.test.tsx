@@ -6,7 +6,8 @@ import App from './App';
 import Permissions from './pages/Settings/Permissions';
 import WriteReviewModal from './pages/Home/DestinationDetail/writeReview/WriteReviewModal';
 import { parseItineraryResponse } from './services/aiService';
-import { hydrateTouristProfile } from './services/sessionService';
+import { hydrateTouristProfile, sanitizeGuideVisibleTourist } from './services/sessionService';
+import { hasCachedOfflineAuthSession, readCachedAuthSession } from './context/AuthContext';
 
 test('renders without crashing', () => {
   const { baseElement } = render(<App />);
@@ -87,6 +88,42 @@ test('hydrates tourist profile fields for session display', () => {
   expect(hydrated.age).toBeGreaterThanOrEqual(21);
 });
 
+test('filters tourist info to guide-safe fields before rendering the roster', () => {
+  const visible = sanitizeGuideVisibleTourist({
+    uid: 'tourist-1',
+    name: 'Jane Doe',
+    email: 'jane@example.com',
+    joinedAt: '2026-08-01T00:00:00.000Z',
+    gender: 'Female',
+    nationality: 'Filipino',
+    religion: 'Christian',
+    dateOfBirth: '2004-03-15',
+    address: '16 Rizal St, Cebu City',
+    age: 22,
+    photoUrl: 'https://example.com/jane.jpg',
+    status: 'Checked-In',
+  });
+
+  expect(visible).toMatchObject({
+    uid: 'tourist-1',
+    name: 'Jane Doe',
+    email: 'jane@example.com',
+    photoUrl: 'https://example.com/jane.jpg',
+    status: 'Checked-In',
+  });
+
+  if (!visible) {
+    throw new Error('sanitizeGuideVisibleTourist returned null for a valid tourist');
+  }
+
+  expect(visible.gender).toBeUndefined();
+  expect(visible.nationality).toBeUndefined();
+  expect(visible.religion).toBeUndefined();
+  expect(visible.dateOfBirth).toBeUndefined();
+  expect(visible.address).toBeUndefined();
+  expect(visible.age).toBeUndefined();
+});
+
 test('parses itinerary JSON from fenced or wrapped AI responses', () => {
   const parsed = parseItineraryResponse(`Here is the itinerary:\n\n\`\`\`json\n[{"day":1,"theme":"Arrival","slots":[{"time":"9:00 AM","activity":"Check in and start at the main gate.","tip":"Go early for cooler weather."}]}]\n\`\``);
 
@@ -104,4 +141,29 @@ test('parses itinerary JSON from fenced or wrapped AI responses', () => {
   const wrapped = parseItineraryResponse('{"days":[{"day":2,"theme":"Evening stroll","slots":[{"time":"5:00 PM","activity":"Walk the plaza.","tip":"Bring a light jacket."}]}]}');
   expect(wrapped).toHaveLength(1);
   expect(wrapped[0].day).toBe(2);
+});
+
+test('keeps the last authenticated user while offline when a cached session exists', () => {
+  const previousOnLine = navigator.onLine;
+  Object.defineProperty(window.navigator, 'onLine', {
+    configurable: true,
+    value: false,
+  });
+
+  localStorage.setItem('catour:offline-auth-cache', JSON.stringify({
+    uid: 'user-123',
+    role: 'user',
+    mustChangePassword: false,
+    status: 'online',
+    updatedAt: Date.now(),
+  }));
+
+  expect(readCachedAuthSession()).toMatchObject({ uid: 'user-123', role: 'user' });
+  expect(hasCachedOfflineAuthSession()).toBe(true);
+
+  localStorage.removeItem('catour:offline-auth-cache');
+  Object.defineProperty(window.navigator, 'onLine', {
+    configurable: true,
+    value: previousOnLine,
+  });
 });

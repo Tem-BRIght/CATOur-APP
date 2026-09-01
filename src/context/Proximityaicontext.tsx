@@ -325,6 +325,10 @@ export const ProximityAIProvider: React.FC<{ children: React.ReactNode }> = ({ c
   const conversationRef = useRef<{ role: 'user' | 'assistant'; content: string }[]>([]);
 
   const { speak, pause: pauseTTS, resume: resumeTTS, stop: stopTTS } = useTextToSpeech();
+  const activeSpeechRef = useRef(0);
+  const invalidateActiveSpeech = useCallback(() => {
+    activeSpeechRef.current += 1;
+  }, []);
 
   // ── Load geofence-eligible destinations once ──────────────────────────────
   // getGeofenceDestinations() also filters out admin-disabled
@@ -364,6 +368,7 @@ export const ProximityAIProvider: React.FC<{ children: React.ReactNode }> = ({ c
     const text = await generateArrivalNarration(dest, { forceRefresh });
     if (!mountedRef.current || activeIdRef.current !== destId) return false;
 
+    const speechToken = ++activeSpeechRef.current;
     conversationRef.current.push({ role: 'assistant', content: text });
     setNarration(text);
     setStatus('speaking');
@@ -372,11 +377,11 @@ export const ProximityAIProvider: React.FC<{ children: React.ReactNode }> = ({ c
     speak(text, {
       lang: 'en-US',
       onEnd: () => {
-        if (!mountedRef.current || activeIdRef.current !== destId) return;
+        if (!mountedRef.current || activeIdRef.current !== destId || speechToken !== activeSpeechRef.current) return;
         setStatus('paused');
       },
       onError: () => {
-        if (!mountedRef.current || activeIdRef.current !== destId) return;
+        if (!mountedRef.current || activeIdRef.current !== destId || speechToken !== activeSpeechRef.current) return;
         setStatus('paused');
       },
     });
@@ -446,6 +451,7 @@ export const ProximityAIProvider: React.FC<{ children: React.ReactNode }> = ({ c
 
   const dismiss = useCallback(() => {
     const id = activeIdRef.current;
+    invalidateActiveSpeech();
     stopTTS();
     setStatus('idle');
     setDestination(null);
@@ -456,17 +462,18 @@ export const ProximityAIProvider: React.FC<{ children: React.ReactNode }> = ({ c
     conversationRef.current = []; // NEW
     activeIdRef.current = null;
     if (id) markTriggered(uid, id);
-  }, [stopTTS, uid]);
+  }, [invalidateActiveSpeech, stopTTS, uid]);
 
   const togglePause = useCallback(() => {
     if (status === 'speaking') {
+      invalidateActiveSpeech();
       pauseTTS();
       setStatus('paused');
     } else if (status === 'paused') {
       resumeTTS();
       setStatus('speaking');
     }
-  }, [status, pauseTTS, resumeTTS]);
+  }, [invalidateActiveSpeech, pauseTTS, resumeTTS, status]);
 
   const resolveDestinationFromText = useCallback((text: string): ProximityDestination | null => {
     const match = resolveNamedDestinationFromText(text, geofenceRef.current);
@@ -503,6 +510,7 @@ export const ProximityAIProvider: React.FC<{ children: React.ReactNode }> = ({ c
     setLiveTranscript('');
     setStatus('loading');
     conversationRef.current.push({ role: 'user', content: trimmed });
+    const speechToken = ++activeSpeechRef.current;
 
     try {
       logAIActivity(uid, 'askQuestion', dest ? { id: dest.id, title: dest.title, name: dest.name } : undefined, trimmed);
@@ -532,11 +540,13 @@ export const ProximityAIProvider: React.FC<{ children: React.ReactNode }> = ({ c
       speak(reply, {
         lang: 'en-US',
         onEnd: () => {
-          if (!mountedRef.current || (destId ? activeIdRef.current !== destId : activeIdRef.current !== null)) return;
+          if (!mountedRef.current || speechToken !== activeSpeechRef.current) return;
+          if (destId ? activeIdRef.current !== destId : activeIdRef.current !== null) return;
           setStatus('paused');
         },
         onError: () => {
-          if (!mountedRef.current || (destId ? activeIdRef.current !== destId : activeIdRef.current !== null)) return;
+          if (!mountedRef.current || speechToken !== activeSpeechRef.current) return;
+          if (destId ? activeIdRef.current !== destId : activeIdRef.current !== null) return;
           setStatus('paused');
         },
       });
@@ -552,11 +562,13 @@ export const ProximityAIProvider: React.FC<{ children: React.ReactNode }> = ({ c
       speak(fallbackReply, {
         lang: 'en-US',
         onEnd: () => {
-          if (!mountedRef.current || (destId ? activeIdRef.current !== destId : activeIdRef.current !== null)) return;
+          if (!mountedRef.current || speechToken !== activeSpeechRef.current) return;
+          if (destId ? activeIdRef.current !== destId : activeIdRef.current !== null) return;
           setStatus('paused');
         },
         onError: () => {
-          if (!mountedRef.current || (destId ? activeIdRef.current !== destId : activeIdRef.current !== null)) return;
+          if (!mountedRef.current || speechToken !== activeSpeechRef.current) return;
+          if (destId ? activeIdRef.current !== destId : activeIdRef.current !== null) return;
           setStatus('paused');
         },
       });

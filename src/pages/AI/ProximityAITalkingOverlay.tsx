@@ -33,9 +33,11 @@
 //   </ProximityAIProvider>
 // ─────────────────────────────────────────────────────────────────────────────
 
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useLocation, useHistory } from 'react-router-dom';
-import { IonIcon } from '@ionic/react';
+import { IonAlert, IonIcon } from '@ionic/react';
+import { App } from '@capacitor/app';
+import { Capacitor } from '@capacitor/core';
 import {
   close,
   playSkipForward,
@@ -73,13 +75,17 @@ const fetchUserCoords = (): Promise<{ lat: number; lng: number } | null> => {
 const ProximityAITalkingOverlay: React.FC = () => {
   const proximityAI = useProximityAIOptional();
   const location = useLocation();
+  const history = useHistory();
 
   const [micError, setMicError] = useState('');
+  const [dragCancel, setDragCancel] = useState(false);
+  const holdStartRef = useRef<{ pointerId: number; originX: number; originY: number } | null>(null);
 
   // ── Route-map overlay (same floating mini-map as the chat AI guide) ──────
   const [routeMapOpen, setRouteMapOpen] = useState(false);
   const [routeMapMinimized, setRouteMapMinimized] = useState(false);
   const [routeMapMaximized, setRouteMapMaximized] = useState(false);
+  const [routeMapPosition, setRouteMapPosition] = useState({ x: 16, y: 140 });
   const [routeDestination, setRouteDestination] = useState<{
     id: string;
     lat?: number | null;
@@ -87,6 +93,9 @@ const ProximityAITalkingOverlay: React.FC = () => {
     location?: { lat?: number | null; lng?: number | null } | null;
   } | null>(null);
   const [userCoords, setUserCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const routeDragRef = React.useRef<{ startX: number; startY: number; originX: number; originY: number } | null>(null);
+  const routeDragPointerIdRef = React.useRef<number | null>(null);
+  const routeDragMovedRef = React.useRef(false);
 
   const {
     isSupported: micSupported,
@@ -130,6 +139,12 @@ const ProximityAITalkingOverlay: React.FC = () => {
     onError: (message: string) => setMicError(message),
   });
 
+  const [showExitAlert, setShowExitAlert] = useState(false);
+
+  // NOTE: only the Home screen owns the native back-button exit confirmation.
+  // This overlay is mounted globally and previously registered a second listener
+  // that raced with Home's own exit alert on Android.
+
   // Rules of Hooks: every hook above must run on every render, so this
   // early-return check has to come after all of them, not before.
   if (!proximityAI) return null;
@@ -163,24 +178,6 @@ const ProximityAITalkingOverlay: React.FC = () => {
     setRouteMapMaximized(false);
   };
 
-  const openRouteMap = async () => {
-    if (!destination) return;
-    setRouteMapOpen(true);
-    setRouteMapMinimized(false);
-    setRouteMapMaximized(false);
-    setRouteDestination({
-      id: destination.id,
-      lat: destination.lat,
-      lng: destination.lng,
-      location: { lat: destination.lat, lng: destination.lng },
-    });
-
-    if (!userCoords) {
-      const coords = await fetchUserCoords();
-      if (coords) setUserCoords(coords);
-    }
-  };
-
   const toggleRouteMapMinimized = () => {
     if (routeMapMinimized) {
       setRouteMapMinimized(false);
@@ -188,6 +185,11 @@ const ProximityAITalkingOverlay: React.FC = () => {
       setRouteMapMinimized(true);
       setRouteMapMaximized(false);
     }
+  };
+
+  const openRouteMapFromMinimized = () => {
+    setRouteMapMinimized(false);
+    setRouteMapMaximized(false);
   };
 
   const toggleRouteMapMaximized = () => {
@@ -199,7 +201,64 @@ const ProximityAITalkingOverlay: React.FC = () => {
     }
   };
 
-  const history = useHistory();
+  const handleRouteMapDragStart = (event: React.PointerEvent<HTMLElement>) => {
+    if (!routeMapOpen || !routeDestination) return;
+
+    const target = event.target as HTMLElement | null;
+    if (target && target !== event.currentTarget && target.closest('button, [role="button"], ion-button')) {
+      return;
+    }
+
+    routeDragMovedRef.current = false;
+    routeDragPointerIdRef.current = event.pointerId;
+    event.currentTarget.setPointerCapture(event.pointerId);
+    routeDragRef.current = {
+      startX: event.clientX,
+      startY: event.clientY,
+      originX: routeMapPosition.x,
+      originY: routeMapPosition.y,
+    };
+    event.preventDefault();
+  };
+
+  const handleRouteMapDragMove = (event: React.PointerEvent<HTMLElement>) => {
+    if (!routeDragRef.current) return;
+    const dx = event.clientX - routeDragRef.current.startX;
+    const dy = event.clientY - routeDragRef.current.startY;
+    if (Math.abs(dx) > 4 || Math.abs(dy) > 4) {
+      routeDragMovedRef.current = true;
+    }
+    setRouteMapPosition({
+      x: Math.min(Math.max(routeDragRef.current.originX + dx, 12), window.innerWidth - 220),
+      y: Math.min(Math.max(routeDragRef.current.originY + dy, 80), window.innerHeight - 110),
+    });
+  };
+
+  const handleRouteMapDragEnd = (event?: React.PointerEvent<HTMLElement>) => {
+    if (event && routeDragPointerIdRef.current !== null && event.currentTarget.hasPointerCapture(routeDragPointerIdRef.current)) {
+      event.currentTarget.releasePointerCapture(routeDragPointerIdRef.current);
+    }
+    routeDragPointerIdRef.current = null;
+    routeDragRef.current = null;
+  };
+
+  const handleExitConfirmed = async () => {
+    setShowExitAlert(false);
+    if (Capacitor.isNativePlatform()) {
+      try {
+        await App.exitApp();
+      } catch {
+        if (typeof window !== 'undefined') {
+          window.close();
+        }
+      }
+      return;
+    }
+
+    if (typeof window !== 'undefined') {
+      window.close();
+    }
+  };
 
   const handleChipClick = async (chipPrompt: string) => {
     if (isLoading || micListening) return;
@@ -244,17 +303,52 @@ const ProximityAITalkingOverlay: React.FC = () => {
     if (isSpeaking) {
       safeTogglePause();
     }
+    holdStartRef.current = { pointerId: e.pointerId, originX: e.clientX, originY: e.clientY };
+    setDragCancel(false);
     setMicError('');
     micStart();
   };
 
-  const handlePressEnd = (e: React.PointerEvent) => {
+  const handlePressMove = (e: React.PointerEvent) => {
+    const holdStart = holdStartRef.current;
+    if (!holdStart || !micListening) return;
+
+    const dx = e.clientX - holdStart.originX;
+    const dy = e.clientY - holdStart.originY;
+    const shouldCancel = Math.abs(dx) > 90 || Math.abs(dy) > 90;
+    setDragCancel(shouldCancel);
+  };
+
+  const handlePressEnd = async (e: React.PointerEvent) => {
     e.preventDefault();
-    if (micListening) micStop();
+
+    const shouldCancel = dragCancel && holdStartRef.current && micListening;
+    holdStartRef.current = null;
+    setDragCancel(false);
+
+    if (shouldCancel) {
+      await micReset();
+      setMicError('');
+      return;
+    }
+
+    if (micListening) {
+      await micStop();
+    }
   };
 
   return (
     <>
+      <IonAlert
+        isOpen={showExitAlert}
+        header="Exit application?"
+        message="Do you want to exit the application?"
+        buttons={[
+          { text: 'No', role: 'cancel', handler: () => setShowExitAlert(false) },
+          { text: 'Yes', handler: handleExitConfirmed },
+        ]}
+      />
+
       <div className="ai-talking-backdrop">
         <button
           className="ai-talking-close"
@@ -329,8 +423,9 @@ const ProximityAITalkingOverlay: React.FC = () => {
                 touch in one handler set, so this works the same in a
                 browser tab and the compiled APK. */}
             <button
-              className={`ai-talking-pill${micListening ? ' listening' : ''}`}
+              className={`ai-talking-pill${micListening ? ' listening' : ''}${dragCancel ? ' canceling' : ''}`}
               onPointerDown={handlePressStart}
+              onPointerMove={handlePressMove}
               onPointerUp={handlePressEnd}
               onPointerLeave={handlePressEnd}
               onContextMenu={(e) => e.preventDefault()}
@@ -340,7 +435,7 @@ const ProximityAITalkingOverlay: React.FC = () => {
               <span className="ai-talking-pill-text">
                 <IonIcon icon={mic} />{' '}
                 {micListening
-                  ? (micTranscript || 'Listening…')
+                  ? (dragCancel ? 'Release to cancel' : (micTranscript || 'Listening…'))
                   : destination
                     ? 'Hold to talk about this place'
                     : 'Hold to ask me anything'}
@@ -349,6 +444,18 @@ const ProximityAITalkingOverlay: React.FC = () => {
                 <span /><span /><span /><span /><span />
               </div>
             </button>
+
+            {micListening && (
+              <button
+                className="ai-talking-icon-btn primary"
+                onClick={async () => { await micStop(); }}
+                disabled={isLoading}
+                aria-label="Stop recording"
+                title="Stop recording"
+              >
+                <IonIcon icon={close} />
+              </button>
+            )}
 
             <button
               className="ai-talking-icon-btn"
@@ -360,15 +467,6 @@ const ProximityAITalkingOverlay: React.FC = () => {
               <IonIcon icon={refresh} />
             </button>
 
-            <button
-              className="ai-talking-icon-btn"
-              onClick={openRouteMap}
-              disabled={!destination || isLoading}
-              aria-label="View route on map"
-              title={destination ? 'View route on map' : 'A destination is required to show directions'}
-            >
-              <IonIcon icon={mapOutline} />
-            </button>
           </div>
 
           <div className="ai-talking-guide-row">
@@ -384,46 +482,107 @@ const ProximityAITalkingOverlay: React.FC = () => {
           </div>
         </div>
 
+        {!routeMapOpen && routeDestination && (
+          <button
+            type="button"
+            className="ai-route-map-reopen-pill"
+            onClick={() => {
+              setRouteMapOpen(true);
+              setRouteMapMinimized(false);
+              setRouteMapMaximized(false);
+            }}
+            style={{
+              position: 'fixed',
+              right: '16px',
+              bottom: '80px',
+              zIndex: 10001,
+              border: '0',
+              borderRadius: '999px',
+              background: 'linear-gradient(135deg, #ffffff 0%, #eaf3ff 100%)',
+              color: '#0f172a',
+              fontWeight: 700,
+              fontSize: '13px',
+              padding: '10px 16px',
+              boxShadow: '0 10px 28px rgba(0, 0, 0, 0.18)',
+              cursor: 'pointer',
+            }}
+          >
+            <IonIcon icon={mapOutline} />
+            <span style={{ marginLeft: '8px' }}>Reopen route</span>
+          </button>
+        )}
+
         {routeMapOpen && routeDestination && (
           <div
             className={`ai-route-map-overlay${routeMapMinimized ? ' minimized' : ''}${routeMapMaximized ? ' maximized' : ''}`}
-            onClick={routeMapMinimized ? toggleRouteMapMinimized : undefined}
+            style={routeMapOpen && routeDestination ? { left: routeMapPosition.x, top: routeMapPosition.y, right: 'auto', bottom: 'auto' } : undefined}
+            onPointerDown={routeMapOpen && routeDestination ? handleRouteMapDragStart : undefined}
+            onPointerMove={routeMapOpen && routeDestination ? handleRouteMapDragMove : undefined}
+            onPointerUp={handleRouteMapDragEnd}
+            onPointerLeave={handleRouteMapDragEnd}
           >
-            <button
-              className="ai-route-map-toggle"
-              aria-label={routeMapMinimized ? 'Expand route map' : 'Minimize route map'}
-              onClick={(e) => {
-                e.stopPropagation();
-                toggleRouteMapMinimized();
-              }}
-            >
-              {routeMapMinimized ? '+' : '−'}
-            </button>
-            {!routeMapMinimized && (
+            {routeMapMinimized ? (
               <button
-                className="ai-route-map-maximize"
-                aria-label={routeMapMaximized ? 'Restore route map size' : 'Maximize route map'}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  toggleRouteMapMaximized();
+                type="button"
+                className="ai-route-map-mini-pill"
+                aria-label="Open route map"
+                title="Open route map"
+                onPointerDown={(event) => {
+                  event.stopPropagation();
+                  handleRouteMapDragStart(event);
+                }}
+                onPointerMove={(event) => {
+                  event.stopPropagation();
+                  handleRouteMapDragMove(event);
+                }}
+                onPointerUp={(event) => {
+                  event.stopPropagation();
+                  handleRouteMapDragEnd();
+                  if (!routeDragMovedRef.current) {
+                    openRouteMapFromMinimized();
+                  }
+                  routeDragMovedRef.current = false;
+                }}
+                onPointerLeave={() => {
+                  handleRouteMapDragEnd();
+                }}
+                onPointerCancel={() => {
+                  handleRouteMapDragEnd();
+                }}
+                onClick={(event) => {
+                  event.preventDefault();
                 }}
               >
-                <IonIcon icon={routeMapMaximized ? contractOutline : expandOutline} />
+                <IonIcon icon={mapOutline} />
+                <span>Open</span>
               </button>
+            ) : (
+              <>
+                <button
+                  className="ai-route-map-maximize"
+                  aria-label={routeMapMaximized ? 'Restore route map size' : 'Maximize route map'}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    toggleRouteMapMaximized();
+                  }}
+                  slot="end"
+                >
+                  <IonIcon icon={routeMapMaximized ? contractOutline : expandOutline} />
+                </button>
+                <button
+                  className="ai-route-map-close"
+                  aria-label="Close route map"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    closeRouteMap();
+                  }}
+                  slot="end"
+                >
+                  <IonIcon icon={close} />
+                </button>
+                <IntegratedRouteMap destination={routeDestination} origin={userCoords} />
+              </>
             )}
-            {!routeMapMinimized && (
-              <button
-                className="ai-route-map-close"
-                aria-label="Close route map"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  closeRouteMap();
-                }}
-              >
-                <IonIcon icon={close} />
-              </button>
-            )}
-            {!routeMapMinimized && <IntegratedRouteMap destination={routeDestination} origin={userCoords} />}
           </div>
         )}
       </div>

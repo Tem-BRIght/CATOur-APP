@@ -35,11 +35,11 @@ import { useSpeechRecognition } from '../../hooks/useSpeechRecognition';
 // inside it says "aiGuideService.ts" (leftover from an earlier draft), but
 // the import path below matches the REAL filename on disk. If you ever
 // rename the file, update this import to match.
-import { askAIGuide, recordSearchTerm, recordDestinationView, ChatTurn } from '../../services/aiService';
+import { askAIGuide, recordSearchTerm, recordDestinationView, ChatTurn, parseRouteIntent } from '../../services/aiService';
 import { speak as speakTts, stop as stopTts, pause as pauseTts, resume as resumeTts, subscribeTts } from '../../services/ttsService';
 import { getProfilePicCache } from '../../utils/profileImageStorage';
 import { safeVibrate } from '../../utils/vibration';
-import { DirectionsRenderer, GoogleMap, LoadScript, MarkerF } from '@react-google-maps/api';
+import { DirectionsRenderer, GoogleMap, MarkerF, useJsApiLoader } from '@react-google-maps/api';
 import { Capacitor } from '@capacitor/core';
 import './AIGuide.css';
 
@@ -160,6 +160,10 @@ export const IntegratedRouteMap: React.FC<{
   const history = useHistory();
   const coords = destinationCoords(destination);
   const mapRef = useRef<google.maps.Map | null>(null);
+  const { isLoaded } = useJsApiLoader({
+    id: 'catour-google-maps',
+    googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY,
+  });
   const [mapsReady, setMapsReady] = useState(false);
   const [directions, setDirections] = useState<google.maps.DirectionsResult | null>(null);
   const [travelMode, setTravelMode] = useState<'walking' | 'driving'>('walking');
@@ -247,7 +251,7 @@ export const IntegratedRouteMap: React.FC<{
         )}
       </div>
 
-      <LoadScript googleMapsApiKey={import.meta.env.VITE_GOOGLE_MAPS_API_KEY}>
+      {isLoaded && (
         <GoogleMap
           mapContainerClassName="ai-route-map-frame"
           center={center}
@@ -266,7 +270,20 @@ export const IntegratedRouteMap: React.FC<{
             ],
           }}
         >
-          {origin && <MarkerF position={origin} label="You" />}
+          {origin && (
+            <MarkerF
+              position={origin}
+              title="Your current location"
+              icon={{
+                path: 0 as google.maps.SymbolPath,
+                scale: 9,
+                fillColor: '#1677ff',
+                fillOpacity: 1,
+                strokeColor: '#ffffff',
+                strokeWeight: 3,
+              }}
+            />
+          )}
           {coords && <MarkerF position={coords} label="Destination" />}
           {directions && (
             <DirectionsRenderer
@@ -275,7 +292,7 @@ export const IntegratedRouteMap: React.FC<{
             />
           )}
         </GoogleMap>
-      </LoadScript>
+      )}
 
       {/* Destination Info Card at bottom of AI Navigation */}
       <div className={`ai-route-dest-card${showDetails ? '' : ' collapsed'}`}>
@@ -518,7 +535,12 @@ const AIGuide: React.FC = () => {
   const [routeMapOpen, setRouteMapOpen] = useState(false);
   const [routeMapMinimized, setRouteMapMinimized] = useState(false);
   const [routeMapMaximized, setRouteMapMaximized] = useState(false);
+  const [routeMapPosition, setRouteMapPosition] = useState({ x: 16, y: 140 });
   const [routeDestination, setRouteDestination] = useState<Destination | null>(null);
+  const [routeOrigin, setRouteOrigin] = useState<{ lat: number; lng: number } | null>(null);
+  const routeDragRef = useRef<{ startX: number; startY: number; originX: number; originY: number } | null>(null);
+  const routeDragPointerIdRef = useRef<number | null>(null);
+  const routeDragMovedRef = useRef(false);
 
   // Destinations — raw Firestore docs, passed straight into askAIGuide()
   const [destinations, setDestinations]   = useState<Destination[]>([]);
@@ -608,14 +630,16 @@ const AIGuide: React.FC = () => {
 
   useEffect(() => {
     if (!navigator.geolocation) return;
-    navigator.geolocation.getCurrentPosition(
+    const watchId = navigator.geolocation.watchPosition(
       pos => {
         if (!mountedRef.current) return;
         setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude });
       },
       err => console.warn('Geolocation unavailable:', err.message),
-      { enableHighAccuracy: true, timeout: 10_000 }
+      { enableHighAccuracy: true, timeout: 10_000, maximumAge: 30_000 }
     );
+
+    return () => navigator.geolocation.clearWatch(watchId);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Fetch destinations ─────────────────────────────────────────────────────
@@ -872,8 +896,8 @@ const AIGuide: React.FC = () => {
       });
 
       const suggestedPlaces = response.recommendedDestinationIds
-        .map(id => placesById.get(id))
-        .filter((p): p is PlaceSuggestion => !!p);
+        .map((id: string) => placesById.get(id))
+        .filter((p: PlaceSuggestion | undefined): p is PlaceSuggestion => !!p);
 
       return { text: getDisplayReply(response.reply), places: suggestedPlaces, showRouteToId: response.showRouteToId };
     } catch (error) {
@@ -939,7 +963,18 @@ const AIGuide: React.FC = () => {
           }
         }
         if (destination && mountedRef.current) {
+          const routeIntent = parseRouteIntent(trimmed, destinations);
+          const explicitOriginId = routeIntent?.originId;
+          const explicitOriginDestination = explicitOriginId
+            ? destinations.find(place => place.id === explicitOriginId) ?? null
+            : null;
+          const explicitOriginCoords = explicitOriginDestination
+            ? (destinationCoords(explicitOriginDestination as RouteMapDestination) ?? null)
+            : null;
           setRouteDestination(destination);
+          // A normal route follows the latest watched userLocation; only an
+          // explicitly requested origin should remain fixed.
+          setRouteOrigin(explicitOriginCoords);
           setRouteMapOpen(true);
           setRouteMapMinimized(false);
           setRouteMapMaximized(false);
@@ -1031,8 +1066,15 @@ const AIGuide: React.FC = () => {
     stopSpeaking();
     if (user?.uid) recordDestinationView(user.uid, place.id);
     if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
-    history.push(`/destination/${place.id}`, place);
-  }, [history, stopSpeaking, user]);
+
+    const fullDestination = destinations.find(dest => dest.id === place.id) ?? null;
+    if (fullDestination) {
+      history.push(`/destination/${place.id}`, fullDestination);
+      return;
+    }
+
+    history.push(`/destination/${place.id}`);
+  }, [destinations, history, stopSpeaking, user]);
 
   // ── Message tap (play/pause) ───────────────────────────────────────────────
 
@@ -1070,6 +1112,11 @@ const AIGuide: React.FC = () => {
     }
   };
 
+  const openRouteMapFromMinimized = () => {
+    setRouteMapMinimized(false);
+    setRouteMapMaximized(false);
+  };
+
   const toggleRouteMapMaximized = () => {
     if (routeMapMaximized) {
       setRouteMapMaximized(false);
@@ -1079,8 +1126,55 @@ const AIGuide: React.FC = () => {
     }
   };
 
+  const handleRouteMapDragStart = (event: React.PointerEvent<HTMLElement>) => {
+    if (!routeMapOpen || !routeDestination) return;
+
+    const target = event.target as HTMLElement | null;
+    if (target && target !== event.currentTarget && target.closest('button, [role="button"], ion-button')) {
+      return;
+    }
+
+    routeDragMovedRef.current = false;
+    routeDragPointerIdRef.current = event.pointerId;
+    event.currentTarget.setPointerCapture(event.pointerId);
+    routeDragRef.current = {
+      startX: event.clientX,
+      startY: event.clientY,
+      originX: routeMapPosition.x,
+      originY: routeMapPosition.y,
+    };
+    event.preventDefault();
+  };
+
+  const handleRouteMapDragMove = (event: React.PointerEvent<HTMLElement>) => {
+    if (!routeDragRef.current) return;
+    const dx = event.clientX - routeDragRef.current.startX;
+    const dy = event.clientY - routeDragRef.current.startY;
+    if (Math.abs(dx) > 4 || Math.abs(dy) > 4) {
+      routeDragMovedRef.current = true;
+    }
+    setRouteMapPosition({
+      x: Math.min(Math.max(routeDragRef.current.originX + dx, 12), window.innerWidth - 220),
+      y: Math.min(Math.max(routeDragRef.current.originY + dy, 80), window.innerHeight - 110),
+    });
+  };
+
+  const handleRouteMapDragEnd = (event?: React.PointerEvent<HTMLElement>) => {
+    if (event && routeDragPointerIdRef.current !== null && event.currentTarget.hasPointerCapture(routeDragPointerIdRef.current)) {
+      event.currentTarget.releasePointerCapture(routeDragPointerIdRef.current);
+    }
+    routeDragPointerIdRef.current = null;
+    routeDragRef.current = null;
+  };
+
   const closeRouteMap = () => {
     setRouteMapOpen(false);
+    setRouteMapMinimized(false);
+    setRouteMapMaximized(false);
+  };
+
+  const reopenRouteMap = () => {
+    setRouteMapOpen(true);
     setRouteMapMinimized(false);
     setRouteMapMaximized(false);
   };
@@ -1090,12 +1184,12 @@ const AIGuide: React.FC = () => {
   return (
     <IonPage>
       {/* Header */}
-      <IonHeader className="ai-header">
+      <IonHeader className={routeMapMaximized ? 'route-map-title-hidden' : undefined}>
         <IonToolbar>
           <IonButtons slot="start">
             <IonBackButton defaultHref="/Home" />
           </IonButtons>
-          <IonTitle>
+          <IonTitle >
             <div className="title">AI Pasig Guide</div>
             <div className="subtitle">Assistant for Pasig City</div>
           </IonTitle>
@@ -1263,76 +1357,111 @@ const AIGuide: React.FC = () => {
                 </div>
               )}
 
-              {/* NEW — "View route" action: only rendered when aiService.ts
-                  actually computed a real walking route for this reply
-                  (see AIGuideResponse.showRouteToId). Opens the floating
-                  route-map overlay pre-loaded with this destination, so
-                  the chat stays usable while the map is minimized. */}
-              {msg.showRouteToId && (
-                <button
-                  className="place-card"
-                  style={{ marginTop: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
-                  onClick={async () => {
-                    const destinationId = msg.showRouteToId!;
-                    let destination = destinations.find(place => place.id === destinationId) ?? null;
-                    if (!destination) destination = await fetchDestinationById(destinationId);
-                    if (!destination) {
-                      showError('Unable to load that destination for directions.');
-                      return;
-                    }
-                    setRouteDestination(destination);
-                    setRouteMapOpen(true);
-                    setRouteMapMinimized(false);
-                    setRouteMapMaximized(false);
-                  }}
-                >
-                  <IonIcon icon={location} aria-hidden="true" />
-                  View route on map
-                </button>
-              )}
             </div>
           ))}
+
+          {!routeMapOpen && routeDestination && (
+            <button
+              type="button"
+              className="ai-route-map-reopen-pill"
+              onClick={reopenRouteMap}
+              style={{
+                position: 'fixed',
+                right: '16px',
+                bottom: '100px',
+                zIndex: 2001,
+                border: '0',
+                borderRadius: '999px',
+                background: 'linear-gradient(135deg, #ffffff 0%, #eaf3ff 100%)',
+                color: '#0f172a',
+                fontWeight: 700,
+                fontSize: '13px',
+                padding: '10px 16px',
+                boxShadow: '0 10px 28px rgba(0, 0, 0, 0.18)',
+                cursor: 'pointer',
+              }}
+            >
+              <IonIcon icon={navigateOutline} />
+              <span style={{ marginLeft: '8px' }}>Reopen route</span>
+            </button>
+          )}
 
           {routeMapOpen && routeDestination && (
             <div
               className={`ai-route-map-overlay${routeMapMinimized ? ' minimized' : ''}${routeMapMaximized ? ' maximized' : ''}`}
-              onClick={routeMapMinimized ? toggleRouteMapMinimized : undefined}
+              style={routeMapOpen && routeDestination ? { left: routeMapPosition.x, top: routeMapPosition.y, right: 'auto', bottom: 'auto' } : undefined}
+              onPointerDown={routeMapOpen && routeDestination ? handleRouteMapDragStart : undefined}
+              onPointerMove={routeMapOpen && routeDestination ? handleRouteMapDragMove : undefined}
+              onPointerUp={handleRouteMapDragEnd}
+              onPointerLeave={handleRouteMapDragEnd}
+              onClick={routeMapMinimized ? (event) => {
+                if (routeDragMovedRef.current) {
+                  routeDragMovedRef.current = false;
+                  return;
+                }
+                toggleRouteMapMinimized();
+              } : undefined}
             >
-              <button
-                className="ai-route-map-toggle"
-                aria-label={routeMapMinimized ? 'Expand route map' : 'Minimize route map'}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  toggleRouteMapMinimized();
-                }}
-              >
-                {routeMapMinimized ? '+' : '−'}
-              </button>
-              {!routeMapMinimized && (
+              {routeMapMinimized ? (
                 <button
-                  className="ai-route-map-maximize"
-                  aria-label={routeMapMaximized ? 'Restore route map size' : 'Maximize route map'}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    toggleRouteMapMaximized();
+                  type="button"
+                  className="ai-route-map-mini-pill"
+                  aria-label="Open route map"
+                  title="Open route map"
+                  onPointerDown={(event) => {
+                    event.stopPropagation();
+                    handleRouteMapDragStart(event);
+                  }}
+                  onPointerMove={(event) => {
+                    event.stopPropagation();
+                    handleRouteMapDragMove(event);
+                  }}
+                  onPointerUp={(event) => {
+                    event.stopPropagation();
+                    handleRouteMapDragEnd();
+                    if (!routeDragMovedRef.current) {
+                      openRouteMapFromMinimized();
+                    }
+                    routeDragMovedRef.current = false;
+                  }}
+                  onPointerLeave={() => {
+                    handleRouteMapDragEnd();
+                  }}
+                  onPointerCancel={() => {
+                    handleRouteMapDragEnd();
+                  }}
+                  onClick={(event) => {
+                    event.preventDefault();
                   }}
                 >
-                  <IonIcon icon={routeMapMaximized ? contractOutline : expandOutline} />
+                  <IonIcon icon={navigateOutline} />
+                  <span>Open</span>
                 </button>
+              ) : (
+                <>
+                  <button
+                    className="ai-route-map-maximize"
+                    aria-label={routeMapMaximized ? 'Restore route map size' : 'Maximize route map'}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleRouteMapMaximized();
+                    }}
+                  >
+                    <IonIcon icon={routeMapMaximized ? contractOutline : expandOutline} />
+                  </button>
+                  <button
+                    className="ai-route-map-close"
+                    aria-label="Close route map"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      closeRouteMap();
+                    }}
+                  >
+                    <IonIcon icon={close} />
+                  </button>
+                  <IntegratedRouteMap destination={routeDestination} origin={routeOrigin ?? userLocation} />
+                </>
               )}
-              {!routeMapMinimized && (
-                <button
-                  className="ai-route-map-close"
-                  aria-label="Close route map"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    closeRouteMap();
-                  }}
-                >
-                  <IonIcon icon={close} />
-                </button>
-              )}
-              {!routeMapMinimized && <IntegratedRouteMap destination={routeDestination} origin={userLocation} />}
             </div>
           )}
 

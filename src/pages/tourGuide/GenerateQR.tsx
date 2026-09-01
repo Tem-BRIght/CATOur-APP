@@ -11,8 +11,9 @@ import {
 import { collection, doc, documentId, getDoc, getDocs, query, where } from 'firebase/firestore';
 import { firestore } from '../../firebase';
 import { useAuth } from '../../context/AuthContext';
-import { getOrCreateSessionForSlot } from '../../services/sessionService';
+import { getOrCreateSessionForSlot, updateSlotWithSessionId } from '../../services/sessionService';
 import { resolveGuideTourTypeIds } from '../../services/tourScheduleService';
+import { shouldShowTouristList } from './touristListAccess';
 import './GenerateQR.css';
 
 type TourType = { id: string; name: string };
@@ -75,6 +76,7 @@ const GenerateQR: React.FC = () => {
   const [sessionId, setSessionId] = useState('');
   const [expiresIn, setExpiresIn] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
+  const [hasCheckedInTourist, setHasCheckedInTourist] = useState(false);
   const [toastMsg, setToastMsg] = useState('');
 
   useEffect(() => {
@@ -190,7 +192,10 @@ const GenerateQR: React.FC = () => {
         destinationId, destinationName, tourTypeId: selectedType.id, tourTypeName: selectedType.name,
         guideId: currentUser.uid, guideName, date: activeSlot.date, startTime: activeSlot.startTime, endTime: activeSlot.endTime,
       });
+      // Link the session back to the slot so admin can find it in Tour Available Slots
+      await updateSlotWithSessionId(currentUser.uid, activeSlot.date, activeSlot.startTime, session.id);
       setSessionId(session.id);
+      setHasCheckedInTourist(shouldShowTouristList(session));
       setQrUrl(buildQRUrl(session.id));
       const endMs = new Date(session.endTime || `${activeSlot.date}T${activeSlot.endTime}:00`).getTime();
       setExpiresIn(Math.max(0, Math.floor((endMs - Date.now()) / 1000)));
@@ -264,7 +269,7 @@ const GenerateQR: React.FC = () => {
             : <img src={qrUrl} alt="Session QR Code" className="qr-image" />}
         </div>{!isLoading && <div className={`qr-timer ${expiresIn <= 300 ? 'warning' : ''} ${isExpired ? 'expired-timer' : ''}`}><IonIcon icon={timeOutline} /><span>{isExpired ? 'Tour ended' : `Ends in ${formatTime(expiresIn)}`}</span></div>}</div>
         {!isLoading && <div className="session-badge"><IonIcon icon={checkmarkCircleOutline} /><span>Session ID: {sessionId}</span></div>}
-        <IonButton expand="block" className="view-list-btn" routerLink={`/tourguide/list/${sessionId}`} disabled={!sessionId || isLoading || isExpired}><IonIcon icon={listOutline} slot="start" />{isExpired ? 'Tour Ended' : 'View List'}</IonButton>
+        <IonButton expand="block" className="view-list-btn" routerLink={`/tourguide/list/${sessionId}`} disabled={!sessionId || isLoading || isExpired || !hasCheckedInTourist}><IonIcon icon={listOutline} slot="start" />{isExpired ? 'Tour Ended' : !hasCheckedInTourist ? 'Waiting for check-in' : 'View List'}</IonButton>
         <IonButton expand="block" fill="outline" className="view-list-btn" onClick={generateQR} style={{ marginTop: '8px' }}><IonIcon icon={refreshOutline} slot="start" />Refresh QR</IonButton>
       </>}
     </div></IonContent>

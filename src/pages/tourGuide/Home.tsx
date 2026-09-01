@@ -20,6 +20,7 @@ import {
 import { doc, getDoc, collection, query, where, onSnapshot } from 'firebase/firestore';
 import { firestore } from '../../firebase';
 import { useAuth } from '../../context/AuthContext';
+import { shouldShowTouristList } from './touristListAccess';
 import './Home.css';
 
 const Home: React.FC = () => {
@@ -99,20 +100,21 @@ const Home: React.FC = () => {
           return;
         }
 
-        const activeSessionDoc = snap.docs.find((doc) => (doc.data() as any).status === 'active');
-        const pendingJoinedDoc = snap.docs.find((doc) => {
+        const activeCheckedInDoc = snap.docs.find((doc) => {
           const data = doc.data() as any;
-          return data.status === 'pending' && Array.isArray(data.tourists) && data.tourists.length > 0;
+          return shouldShowTouristList({
+            status: data.status,
+            checkedInUids: Array.isArray(data.checkedInUids) ? data.checkedInUids : [],
+          });
         });
 
-        const selectedDoc = activeSessionDoc || pendingJoinedDoc;
-        if (!selectedDoc) {
+        if (!activeCheckedInDoc) {
           setShowTouristList(false);
           setActiveSessionId(null);
           return;
         }
 
-        setActiveSessionId(selectedDoc.id);
+        setActiveSessionId(activeCheckedInDoc.id);
         setShowTouristList(true);
       },
       (err) => {

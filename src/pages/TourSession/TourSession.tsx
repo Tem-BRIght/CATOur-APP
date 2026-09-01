@@ -23,7 +23,7 @@ import { getSession, subscribeSession } from '../../services/sessionService';
 import type { TourSession } from '../../services/sessionService';
 import { collection, getDocs, documentId, query, where } from 'firebase/firestore';
 import { firestore } from '../../firebase';
-import { DirectionsRenderer, LoadScript, GoogleMap, MarkerF } from '@react-google-maps/api';
+import { DirectionsRenderer, GoogleMap, MarkerF, useJsApiLoader } from '@react-google-maps/api';
 import { useUserLocation } from '../../services/useUserLocation';
 import './TourSession.css';
 
@@ -72,6 +72,10 @@ const TourStopsMap: React.FC<{
   height?: number;
 }> = ({ stops, guideLocation, routeOrigin, routeDestination, height = 200 }) => {
   const mapRef = useRef<google.maps.Map | null>(null);
+  const { isLoaded: mapsLoaded } = useJsApiLoader({
+    id: 'catour-google-maps',
+    googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY,
+  });
   const [directions, setDirections] = useState<google.maps.DirectionsResult | null>(null);
   const points = [
     ...stops.map((stop) => ({ lat: stop.lat, lng: stop.lng })),
@@ -123,7 +127,7 @@ const TourStopsMap: React.FC<{
 
   return (
     <div className="tsm-map-wrap" style={{ height }}>
-      <LoadScript googleMapsApiKey={import.meta.env.VITE_GOOGLE_MAPS_API_KEY}>
+      {mapsLoaded && (
         <GoogleMap
           key={points.map((point) => `${point.lat.toFixed(5)}:${point.lng.toFixed(5)}`).join('|')}
           mapContainerStyle={{ height: '100%', width: '100%' }}
@@ -161,7 +165,7 @@ const TourStopsMap: React.FC<{
             />
           )}
         </GoogleMap>
-      </LoadScript>
+      )}
     </div>
   );
 };
@@ -461,36 +465,6 @@ const TourSession: React.FC = () => {
           )}
         </div>
 
-        {/* Tourist List */}
-        {Array.isArray(session.tourists) && session.tourists.length > 0 && (
-          <div className="ts-section">
-            <div className="ts-section-title">
-              <IonIcon icon={peopleOutline} />
-              <span>Tourists ({session.tourists.length})</span>
-            </div>
-            <IonList className="ts-tourist-list">
-              {session.tourists.map((tourist: any, index: number) => {
-                const touristStatus = tourist.status || 'Pending';
-                const statusClass = touristStatus.toLowerCase();
-                const isYou = currentUser && tourist.uid === currentUser.uid;
-                return (
-                  <IonItem key={tourist.uid || index} className="ts-tourist-item" lines="full">
-                    <IonAvatar className="ts-tourist-avatar">
-                      <IonImg src="https://ionicframework.com/docs/img/demos/avatar.svg" />
-                    </IonAvatar>
-                    <IonLabel>
-                      <h3>{tourist.name || 'Tourist'} {isYou && <small>(You)</small>}</h3>
-                      <p>{tourist.email || 'No email'}</p>
-                    </IonLabel>
-                    <div className={`ts-tourist-status ${statusClass}`}>
-                      {touristStatus}
-                    </div>
-                  </IonItem>
-                );
-              })}
-            </IonList>
-          </div>
-        )}
       </IonContent>
     </IonPage>
   );

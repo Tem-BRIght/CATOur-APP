@@ -142,8 +142,8 @@ service cloud.firestore {
         request.resource.data.tourists.size() == resource.data.tourists.size() + 1
       ) || (
         isSignedIn() &&
-        resource.data.touristUids is list && resource.data.touristUids.hasAny([request.auth.uid]) &&
-        resource.data.cancelledUids is list && resource.data.cancelledUids.hasAny([request.auth.uid]) &&
+          resource.data.touristUids is list && resource.data.touristUids.hasAny([request.auth.uid]) &&
+          (!('cancelledUids' in resource.data) || resource.data.cancelledUids is list) &&
         request.resource.data.touristUids is list &&
         request.resource.data.touristUids.size() == resource.data.touristUids.size() &&
         request.resource.data.tourists is list &&
@@ -175,6 +175,10 @@ service cloud.firestore {
       );
       allow delete: if isSignedIn() && (resource.data.guideId == request.auth.uid || isAdmin());
     }
+
+      match /sessionSlotLocks/{slotKey} {
+        allow read, write: if isSignedIn();
+      }
 
     match /bookings/{id} {
       allow read: if isAdmin() || isSignedIn();

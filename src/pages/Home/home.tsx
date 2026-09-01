@@ -4,8 +4,10 @@ import {
   IonContent, IonHeader, IonPage, IonToolbar,
   IonSearchbar, IonButtons, IonButton, IonIcon,
   IonGrid, IonRow, IonCol, IonCard,
-  IonImg, IonAvatar, IonToast,
+  IonImg, IonAvatar, IonToast, IonAlert,
 } from '@ionic/react';
+import { App } from '@capacitor/app';
+import { Capacitor } from '@capacitor/core';
 import { useHistory } from 'react-router-dom';
 import {
   search, personCircle, notifications,
@@ -46,6 +48,7 @@ const Home: React.FC = () => {
   const [popular, setPopular]         = useState<Destination[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [toastMsg, setToastMsg]       = useState('');
+  const [showExitAlert, setShowExitAlert] = useState(false);
   // rank map: destination title → rank number (1 = most visited)
   const [visitRanks, setVisitRanks]   = useState<Map<string, number>>(new Map());
   // ── Offline detection ────────────────────────────────────────────────────
@@ -68,6 +71,26 @@ const Home: React.FC = () => {
   useEffect(() => {
     if (!authLoading && !isAuthenticated) history.replace('/login');
   }, [isAuthenticated, authLoading, history]);
+
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return;
+
+    const backButtonListener = App.addListener('backButton', ({ canGoBack }) => {
+      const currentPath = history.location.pathname.toLowerCase();
+      const isHomeRoot = currentPath === '/home' || currentPath === '/';
+
+      if (canGoBack && !isHomeRoot) {
+        history.goBack();
+        return;
+      }
+
+      setShowExitAlert(true);
+    });
+
+    return () => {
+      void backButtonListener.then((listener) => listener.remove());
+    };
+  }, [history]);
 
   // ── profile ─────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -420,6 +443,26 @@ const Home: React.FC = () => {
             </IonRow>
           </IonGrid>
         </section>
+
+        <IonAlert
+          isOpen={showExitAlert}
+          header="Exit application?"
+          message="Do you want to exit the application?"
+          buttons={[
+            { text: 'No', role: 'cancel', handler: () => setShowExitAlert(false) },
+            {
+              text: 'Yes',
+              handler: async () => {
+                setShowExitAlert(false);
+                if (Capacitor.isNativePlatform()) {
+                  await App.exitApp();
+                  return;
+                }
+                window.close();
+              },
+            },
+          ]}
+        />
 
         <IonToast
           isOpen={!!toastMsg}

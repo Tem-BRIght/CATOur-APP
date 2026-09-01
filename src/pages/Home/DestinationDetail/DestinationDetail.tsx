@@ -16,10 +16,10 @@ import {
 
 
 import {
-  LoadScript,
   GoogleMap,
   MarkerF,
   DirectionsRenderer,
+  useJsApiLoader,
 } from '@react-google-maps/api';
 import { firestore } from '../../../firebase';
 import { Destination, InfoBlock } from '../../../types';
@@ -89,6 +89,10 @@ const DestinationDetail: React.FC = () => {
   const id   = routeId || qrId;
   const { user } = useAuth();
   const { coords, locationError: locationGpsError } = useUserLocation();
+  const { isLoaded: mapsLoaded } = useJsApiLoader({
+    id: 'catour-google-maps',
+    googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY,
+  });
 
   const [dest, setDest] = useState<Destination | null>((location.state as Destination) || null);
 
@@ -535,7 +539,6 @@ const DestinationDetail: React.FC = () => {
 
     if (coords?.latitude && coords?.longitude) {
       routeFrom(coords.latitude, coords.longitude);
-      return;
     }
 
     const watchHandle = navigator.geolocation.watchPosition(
@@ -963,6 +966,9 @@ const DestinationDetail: React.FC = () => {
         detailedRatings: r.detailedRatings || {},
         allowVenueReply: r.allowVenueReply ?? true,
       }));
+
+  const officialGallery: string[] = Array.from(new Set((d.images?.length ? d.images : (d.photoGallery?.length ? d.photoGallery : [destImageUrl].filter(Boolean))).filter(Boolean)));
+  const visitorGallery: string[] = Array.from(new Set(reviews.flatMap((rev) => rev.photos || []).filter(Boolean)));
 
   // ── Live straight-line distance (updates as user moves via watchPosition) ─
   const destLat = d.location?.lat || d.locationCoords?.lat;
@@ -1421,29 +1427,43 @@ const DestinationDetail: React.FC = () => {
             )}
           </ProseSection>
 
-          {(() => {
-            const reviewPhotos = reviews.flatMap(r => r.photos || []);
-            const baseGallery = photoGallery.length > 0 ? photoGallery : images;
-            const gallery = Array.from(new Set([...baseGallery, ...reviewPhotos].filter(Boolean)));
-            return gallery.length > 0 ? (
-              <ProseSection title="Photo">
-                <div className="dd-gallery-grid">
-                  {gallery.slice(0, 6).map((src: string, i: number) => (
-                    <img
-                      key={i}
-                      src={src}
-                      alt={`Gallery ${i + 1}`}
-                      className="dd-gallery-img"
-                      role="button"
-                      tabIndex={0}
-                      onClick={() => setLightbox({ photos: gallery.map(url => ({ url })), index: i })}
-                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setLightbox({ photos: gallery.map(url => ({ url })), index: i }); }}
-                    />
-                  ))}
-                </div>
-              </ProseSection>
-            ) : null;
-          })()}
+          {officialGallery.length > 0 && (
+            <ProseSection title="Destination Gallery">
+              <div className="dd-gallery-grid">
+                {officialGallery.slice(0, 6).map((src: string, i: number) => (
+                  <img
+                    key={`official-${i}`}
+                    src={src}
+                    alt={`Official gallery ${i + 1}`}
+                    className="dd-gallery-img"
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => setLightbox({ photos: officialGallery.map(url => ({ url })), index: i })}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setLightbox({ photos: officialGallery.map(url => ({ url })), index: i }); }}
+                  />
+                ))}
+              </div>
+            </ProseSection>
+          )}
+
+          {visitorGallery.length > 0 && (
+            <ProseSection title="Visitor Updates / Memories">
+              <div className="dd-gallery-grid">
+                {visitorGallery.slice(0, 6).map((src: string, i: number) => (
+                  <img
+                    key={`visitor-${i}`}
+                    src={src}
+                    alt={`Visitor memory ${i + 1}`}
+                    className="dd-gallery-img"
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => setLightbox({ photos: visitorGallery.map(url => ({ url })), index: i })}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setLightbox({ photos: visitorGallery.map(url => ({ url })), index: i }); }}
+                  />
+                ))}
+              </div>
+            </ProseSection>
+          )}
           <div className="dd-spacer" />
         </div>
 
@@ -1466,7 +1486,7 @@ const DestinationDetail: React.FC = () => {
                       <span className="itin-day-theme">{day.theme}</span>
                     </div>
                     <div className="itin-slots">
-                      {day.slots.map((slot, si) => (
+                      {day.slots.map((slot: typeof day.slots[number], si: number) => (
                         <div key={si} className="itin-slot">
                           <div className="itin-slot-time-col">
                             <span className="itin-slot-time">{slot.time}</span>
@@ -1501,8 +1521,7 @@ const DestinationDetail: React.FC = () => {
           <IonHeader><IonToolbar><IonTitle>{destName} Location</IonTitle><IonButtons slot="end"><IonButton onClick={() => setShowMap(false)}>Close</IonButton></IonButtons></IonToolbar></IonHeader>
           <IonContent scrollY={false}>
             <div className="map-container">
-              <LoadScript googleMapsApiKey={import.meta.env.VITE_GOOGLE_MAPS_API_KEY}>
-                {destCenter && (
+              {mapsLoaded && destCenter && (
                   <GoogleMap
                     mapContainerStyle={{ width: '100%', height: '100%' }}
                     center={destCenter}
@@ -1527,6 +1546,20 @@ const DestinationDetail: React.FC = () => {
                       position={destCenter}
                       title={destName}
                     />
+                    {coords && (
+                      <MarkerF
+                        position={{ lat: coords.latitude, lng: coords.longitude }}
+                        title="Your current location"
+                        icon={{
+                          path: 0 as google.maps.SymbolPath,
+                          scale: 9,
+                          fillColor: '#1677ff',
+                          fillOpacity: 1,
+                          strokeColor: '#ffffff',
+                          strokeWeight: 3,
+                        }}
+                      />
+                    )}
                     {routeResult && (
                       <DirectionsRenderer
                         directions={routeResult}
@@ -1541,8 +1574,7 @@ const DestinationDetail: React.FC = () => {
                       />
                     )}
                   </GoogleMap>
-                )}
-              </LoadScript>
+              )}
             </div>
           </IonContent>
           <IonFooter className="ion-no-border">

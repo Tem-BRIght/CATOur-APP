@@ -110,7 +110,6 @@ const Settings: React.FC = () => {
       case 'My Reviews':       router.push('/my-reviews');                  break;
       case 'Tour Guide':       router.push('/tour');                        break;
       case 'Scan':             router.push('/scan');                        break;
-      case 'Privacy Settings': router.push('/settings/permissions');       break;
       case 'Help Center':      router.push('/settings/help');               break;
       case 'Contact Support':  router.push('/settings/contact-support');    break;
       case 'Report Problem':   router.push('/settings/report-problem');     break;
@@ -283,16 +282,15 @@ const Settings: React.FC = () => {
           </div>
         </div>
 
-        {/* ── Privacy & Security ───────────────────────────────────────────── */}
+        {/* ── Security ───────────────────────────────────────────── */}
+        {hasPasswordProvider && (
         <div className="section">
-          <p className="section-title">Privacy & Security</p>
+          <p className="section-title">Security</p>
           <div className="card">
-            <Item icon={shieldCheckmarkOutline} color="cyan" label="Privacy Settings" onClick={() => onItemClick('Privacy Settings')} />
-            {hasPasswordProvider && (
               <Item icon={lockClosedOutline} color="blue" label="Change Password" onClick={() => onItemClick('Change Password')} />
-            )}
+            
           </div>
-        </div>
+        </div>)}
 
         {/* ── Support ────────────────────────────────────────────────────── */}
         <div className="section">

@@ -18,7 +18,19 @@ http://ionicframework.com/docs/theming/ */
   --catour-safe-right: env(safe-area-inset-right, 0px);
   --catour-safe-bottom: env(safe-area-inset-bottom, 0px);
   --catour-safe-left: env(safe-area-inset-left, 0px);
+  --ion-background-color: var(--catour-page);
+  --ion-background-color-rgb: 240, 246, 253;
+  --ion-text-color: #0f172a;
+  --ion-text-color-rgb: 15, 23, 42;
+  --ion-item-background: var(--catour-surface);
+  --ion-toolbar-background: var(--catour-surface);
+  --ion-card-background: var(--catour-surface);
+  --ion-item-border-color: var(--catour-border);
   --ion-font-family: 'Sora', 'Segoe UI', sans-serif;
+}
+
+html {
+  color-scheme: light dark;
 }
 
 html,
@@ -33,7 +45,7 @@ ion-page,
 }
 
 body {
-  color: #0f172a;
+  color: var(--ion-text-color);
   min-width: 320px;
   background: var(--catour-page);
 }
@@ -42,6 +54,37 @@ body {
 ion-page {
   background: var(--catour-surface, #ffffff);
 }
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --catour-brand-blue: #67c8ff;
+    --catour-navy: #a9d4ff;
+    --catour-sky: #8dd5ff;
+    --catour-surface: #0f172a;
+    --catour-page: #08121f;
+    --catour-border: #1c2f47;
+    --catour-text-muted: #a9bfd8;
+    --ion-background-color: var(--catour-page);
+    --ion-background-color-rgb: 8, 18, 31;
+    --ion-text-color: #edf6ff;
+    --ion-text-color-rgb: 237, 246, 255;
+    --ion-item-background: var(--catour-surface);
+    --ion-toolbar-background: var(--catour-surface);
+    --ion-card-background: var(--catour-surface);
+    --ion-item-border-color: var(--catour-border);
+  }
+
+  body {
+    color: var(--ion-text-color);
+    background: var(--catour-page);
+  }
+
+  .ion-page,
+  ion-page {
+    background: var(--catour-page);
+  }
+}
+
 .safe-area-page {
   padding-top: var(--catour-safe-top);
   padding-right: var(--catour-safe-right);

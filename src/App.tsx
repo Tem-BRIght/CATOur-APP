@@ -48,7 +48,6 @@ import BookingHistory    from './pages/Settings/Tour/Tour';
 import Scan              from './pages/Settings/Scan/Scan';
 import Tourguidefeedback from './pages/TourSession/Tourguidefeedback/TourGuideFeedback';
 import About             from './pages/Settings/About';
-import Permissions       from './pages/Settings/Permissions';
 import Help              from './pages/Settings/Help';
 import ReportProblem     from './pages/Settings/ReportProblem/ReportProblem';
 import ContactSupport    from './pages/Settings/ContactSupport/ContactSupport';
@@ -192,7 +191,6 @@ const App: React.FC = () => {
             <Route exact path="/settings/verify-phone" render={props => <ProtectedView component={VerifyPhone} allowedRole="user" {...props} />} />
             <Route exact path="/settings/change-password" render={props => <ProtectedView component={ChangePassword} allowedRole="user" {...props} />} />
             <Route exact path="/settings/about" render={props => <ProtectedView component={About} allowedRole="user" {...props} />} />
-            <Route exact path="/settings/permissions" render={props => <ProtectedView component={Permissions} allowedRole="user" {...props} />} />
             <Route exact path="/settings/help"  render={props => <ProtectedView component={Help} allowedRole="user" {...props} />} />
             <Route exact path="/settings/report-problem" render={props => <ProtectedView component={ReportProblem} allowedRole="user" {...props} />} />
             <Route exact path="/settings/contact-support" render={props => <ProtectedView component={ContactSupport} allowedRole="user" {...props} />} />

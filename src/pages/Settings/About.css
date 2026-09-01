@@ -26,6 +26,19 @@ ion-content {
   color: #6b7280;
 }
 
+.about-help-answer {
+  --background: #f3f4f6;
+  --padding-start: 24px;
+  --inner-padding-end: 16px;
+}
+
+.about-help-answer p {
+  margin: 0;
+  color: #4b5563;
+  line-height: 1.5;
+  white-space: normal;
+}
+
 /* Card sections */
 ion-list[inset] {
   margin-top: 16px;

@@ -197,6 +197,15 @@ export const updateUserProfile = async (
   }
 };
 
+const PROFILE_IMAGE_MAX_BYTES = 10 * 1024 * 1024;
+const PROFILE_IMAGE_MAX_DIMENSION = 1600;
+
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+}
+
 export const uploadProfilePicture = async (
   userId: string,
   file:   File,
@@ -205,28 +214,54 @@ export const uploadProfilePicture = async (
     throw new Error('Only image files are supported.');
   }
 
+  if (file.size > PROFILE_IMAGE_MAX_BYTES) {
+    throw new Error(`Image is ${formatBytes(file.size)}. Please choose a file up to 10 MB.`);
+  }
+
   const base64DataUrl = await new Promise<string>((resolve, reject) => {
     const img = new Image();
     const objectUrl = URL.createObjectURL(file);
 
     img.onload = () => {
-      const MAX = 500;
-      let { width, height } = img;
+      try {
+        const MAX = PROFILE_IMAGE_MAX_DIMENSION;
+        let { width, height } = img;
 
-      if (width > height) {
-        if (width > MAX) { height = Math.round((height * MAX) / width); width = MAX; }
-      } else {
-        if (height > MAX) { width = Math.round((width * MAX) / height); height = MAX; }
+        if (width > height) {
+          if (width > MAX) { height = Math.round((height * MAX) / width); width = MAX; }
+        } else {
+          if (height > MAX) { width = Math.round((width * MAX) / height); height = MAX; }
+        }
+
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          URL.revokeObjectURL(objectUrl);
+          reject(new Error('Failed to prepare the image for upload.'));
+          return;
+        }
+
+        let quality = 0.82;
+        let dataUrl = '';
+        do {
+          dataUrl = canvas.toDataURL('image/jpeg', quality);
+          const approxBytes = Math.ceil((dataUrl.length * 3) / 4);
+          if (approxBytes <= PROFILE_IMAGE_MAX_BYTES) {
+            URL.revokeObjectURL(objectUrl);
+            resolve(dataUrl);
+            return;
+          }
+          quality -= 0.08;
+        } while (quality >= 0.35);
+
+        URL.revokeObjectURL(objectUrl);
+        reject(new Error(`Image is ${formatBytes(file.size)}. Please choose a file up to 10 MB.`));
+      } catch (error) {
+        URL.revokeObjectURL(objectUrl);
+        reject(error);
       }
-
-      const canvas = document.createElement('canvas');
-      canvas.width  = width;
-      canvas.height = height;
-      const ctx = canvas.getContext('2d')!;
-      ctx.drawImage(img, 0, 0, width, height);
-
-      URL.revokeObjectURL(objectUrl);
-      resolve(canvas.toDataURL('image/jpeg', 0.8));
     };
 
     img.onerror = () => {
@@ -237,11 +272,6 @@ export const uploadProfilePicture = async (
     img.crossOrigin = 'anonymous';
     img.src = objectUrl;
   });
-
-  const approxBytes = Math.ceil((base64DataUrl.length * 3) / 4);
-  if (approxBytes > 900_000) {
-    throw new Error('Compressed image is still too large. Please choose a smaller photo.');
-  }
 
   await updateUserProfile(userId, { img: base64DataUrl });
   return base64DataUrl;

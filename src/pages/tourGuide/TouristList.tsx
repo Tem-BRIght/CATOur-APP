@@ -36,11 +36,13 @@ import {
 import { useAuth } from '../../context/AuthContext';
 import { subscribeSession, updateSessionStatus, markStopVisited, unmarkStopVisited } from '../../services/sessionService';
 import type { TourSession, Tourist } from '../../services/sessionService';
+import { sanitizeGuideVisibleTourist } from '../../services/sessionService';
 import { getOrCreateChat, sendMessage, subscribeMessages, ChatMessage } from '../../services/chatService';
 import { collection, doc, getDoc, getDocs, documentId, orderBy, query, where, setDoc, serverTimestamp } from 'firebase/firestore';
 import { firestore } from '../../firebase';
-import { DirectionsRenderer, LoadScript, GoogleMap, MarkerF } from '@react-google-maps/api';
+import { DirectionsRenderer, GoogleMap, MarkerF, useJsApiLoader } from '@react-google-maps/api';
 import { useUserLocation } from '../../services/useUserLocation';
+import { shouldShowTouristList } from './touristListAccess';
 import './TouristList.css';
 
 const resolveCoords = (dest: any): { lat: number; lng: number } | null => {
@@ -80,6 +82,10 @@ const TourStopsMap: React.FC<{
   height?: number;
 }> = ({ stops, guideLocation, routeOrigin, routeDestination, height = 200 }) => {
   const mapRef = useRef<google.maps.Map | null>(null);
+  const { isLoaded: mapsLoaded } = useJsApiLoader({
+    id: 'catour-google-maps',
+    googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY,
+  });
   const [directions, setDirections] = useState<google.maps.DirectionsResult | null>(null);
   const points = [
     ...stops.map((stop) => ({ lat: stop.lat, lng: stop.lng })),
@@ -134,7 +140,7 @@ const TourStopsMap: React.FC<{
 
   return (
     <div className="tsm-map-wrap" style={{ height }}>
-      <LoadScript googleMapsApiKey={import.meta.env.VITE_GOOGLE_MAPS_API_KEY}>
+      {mapsLoaded && (
         <GoogleMap
           key={points.map((point) => `${point.lat.toFixed(5)}:${point.lng.toFixed(5)}`).join('|')}
           mapContainerStyle={{ height: '100%', width: '100%' }}
@@ -172,7 +178,7 @@ const TourStopsMap: React.FC<{
             />
           )}
         </GoogleMap>
-      </LoadScript>
+      )}
     </div>
   );
 };
@@ -224,8 +230,9 @@ const TouristList: React.FC = () => {
       const unsub = subscribeSession(sessionId, (data) => {
         setSession(data);
         const currentStatus = data?.status ?? 'pending';
+        const listUnlocked = shouldShowTouristList(data);
         const isEndedLike = currentStatus === 'ended' || currentStatus === 'Cancelled';
-        setSessionActive(currentStatus === 'active');
+        setSessionActive(listUnlocked && currentStatus === 'active');
         setIsCompletedSession(isEndedLike);
         setLoading(false);
       });
@@ -263,7 +270,8 @@ const TouristList: React.FC = () => {
         const latest = { id: latestDoc.id, ...latestDoc.data() } as TourSession;
         setSession(latest);
         const isEndedLike = latest.status === 'ended' || latest.status === 'Cancelled';
-        setSessionActive(latest.status === 'active');
+        const listUnlocked = shouldShowTouristList(latest);
+        setSessionActive(listUnlocked && latest.status === 'active');
         setIsCompletedSession(isEndedLike);
       } catch (error) {
         console.error('Failed to load guide session:', error);
@@ -552,11 +560,12 @@ const TouristList: React.FC = () => {
     chatUnsubRef.current?.();
   }, []);
 
-  const tourists = session?.tourists ?? [];
+  const tourists = (session?.tourists ?? []).map((tourist) => sanitizeGuideVisibleTourist(tourist)).filter(Boolean) as Tourist[];
   const filteredTourists = tourists.filter((tourist) =>
-    tourist.name.toLowerCase().includes(searchText.toLowerCase()) ||
-    tourist.email.toLowerCase().includes(searchText.toLowerCase())
+    (tourist.name || '').toLowerCase().includes(searchText.toLowerCase()) ||
+    (tourist.email || '').toLowerCase().includes(searchText.toLowerCase())
   );
+  const touristListUnlocked = session ? shouldShowTouristList(session) : false;
 
   const handleTouristClick = (tourist: Tourist) => {
     setSelectedTourist(tourist);
@@ -600,7 +609,7 @@ const TouristList: React.FC = () => {
       <IonContent className="list-page-content">
 
         {/* ── BEFORE START: search bar first, stats card shows tourists + type of tour ── */}
-        {!sessionActive && (
+        {!sessionActive && touristListUnlocked && (
           <>
             <div className="search-container">
               <IonSearchbar
@@ -701,71 +710,77 @@ const TouristList: React.FC = () => {
 
         <IonCard className="tourist-page-card">
           <IonCardContent>
-            <div className={`tourist-table-header ${isEndedSession ? 'tourist-table-header--completed' : ''}`}>
-              <div className="header-col-id">#</div>
-              <div className="header-col-name">Name</div>
-              <div className="header-col-gender">Gender</div>
-              <div className="header-col-nationality">Nationality</div>
-              <div className="header-col-religion">Religion</div>
-              <div className="header-col-email">Email</div>
-              {isEndedSession && <div className="header-col-feedback">Feedback</div>}
-            </div>
-
-            {loading ? (
+            {!loading && session && !touristListUnlocked ? (
               <div className="no-results">
-                <IonSpinner name="crescent" />
-                <p>Loading tour session…</p>
+                <p>Tourist list unlocks after the first QR check-in.</p>
               </div>
             ) : (
-              <IonList className="tourist-page-list">
-                {filteredTourists.length > 0 ? (
-                  filteredTourists.map((tourist, index) => (
-                    <IonItem
-                      key={`${tourist.uid}-${index}`}
-                      className={`tourist-page-row ${isEndedSession ? 'tourist-page-row--completed' : ''}`}
-                      lines="full"
-                      button
-                      onClick={() => handleTouristClick(tourist)}
-                    >
-                      <div className="row-col-id">{index + 1}</div>
-                      <div className="row-col-name">
-                        <IonAvatar className="tourist-avatar">
-                          <IonImg src="https://ionicframework.com/docs/img/demos/avatar.svg" />
-                        </IonAvatar>
-                        <span className="tourist-name">
-                          {tourist.name}
-                          {currentUser?.uid === tourist.uid && ' (You)'}
-                        </span>
-                      </div>
-                      <div className="row-col-gender">{tourist.gender || '—'}</div>
-                      <div className="row-col-nationality">{tourist.nationality || '—'}</div>
-                      <div className="row-col-religion">{tourist.religion || '—'}</div>
-                      <div className="row-col-email">{tourist.email}</div>
-                      {isEndedSession && (
-                        <div className={`row-col-feedback ${reviewedTouristIds.has(tourist.uid) ? 'feedback-reviewed' : 'feedback-pending'}`}>
-                          {reviewedTouristIds.has(tourist.uid) ? (
-                            <IonButton
-                              fill="clear"
-                              size="small"
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                history.push(`/reviews/${session.id}?touristId=${encodeURIComponent(tourist.uid)}`);
-                              }}
-                            >
-                              View Feedback
-                            </IonButton>
-                          ) : 'Pending'}
-                        </div>
-                      )}
-                    </IonItem>
-                  ))
-                ) : (
+              <>
+                <div className={`tourist-table-header ${isEndedSession ? 'tourist-table-header--completed' : ''}`}>
+                  <div className="header-col-id">#</div>
+                  <div className="header-col-name">Name</div>
+                  <div className="header-col-email">Email</div>
+                  <div className="header-col-status">Status</div>
+                  {isEndedSession && <div className="header-col-feedback">Feedback</div>}
+                </div>
+
+                {loading ? (
                   <div className="no-results">
-                    <IonIcon icon={searchOutline} />
-                    <p>{sessionId ? 'No tourists have joined this tour yet.' : 'Generate a QR code first to track tourists.'}</p>
+                    <IonSpinner name="crescent" />
+                    <p>Loading tour session…</p>
                   </div>
+                ) : (
+                  <IonList className="tourist-page-list">
+                    {filteredTourists.length > 0 ? (
+                      filteredTourists.map((tourist, index) => (
+                        <IonItem
+                          key={`${tourist.uid}-${index}`}
+                          className={`tourist-page-row ${isEndedSession ? 'tourist-page-row--completed' : ''}`}
+                          lines="full"
+                          button
+                          onClick={() => handleTouristClick(tourist)}
+                        >
+                          <div className="row-col-id">{index + 1}</div>
+                          <div className="row-col-name">
+                            <IonAvatar className="tourist-avatar">
+                              <IonImg src={tourist.photoUrl || tourist.img || 'https://ionicframework.com/docs/img/demos/avatar.svg'} />
+                            </IonAvatar>
+                            <span className="tourist-name">
+                              {tourist.name}
+                              {currentUser?.uid === tourist.uid && ' (You)'}
+                            </span>
+                          </div>
+                          <div className="row-col-email">{tourist.email || '—'}</div>
+                          <div className={`row-col-status ${tourist.status === 'Checked-In' ? 'status-checked-in' : tourist.status === 'Cancelled' ? 'status-cancelled' : 'status-joined'}`}>
+                            {tourist.status || 'Joined'}
+                          </div>
+                          {isEndedSession && (
+                            <div className={`row-col-feedback ${reviewedTouristIds.has(tourist.uid) ? 'feedback-reviewed' : 'feedback-pending'}`}>
+                              {reviewedTouristIds.has(tourist.uid) ? (
+                                <IonButton
+                                  fill="clear"
+                                  size="small"
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    history.push(`/reviews/${session.id}?touristId=${encodeURIComponent(tourist.uid)}`);
+                                  }}
+                                >
+                                  View Feedback
+                                </IonButton>
+                              ) : 'Pending'}
+                            </div>
+                          )}
+                        </IonItem>
+                      ))
+                    ) : (
+                      <div className="no-results">
+                        <IonIcon icon={searchOutline} />
+                        <p>{sessionId ? 'No tourists have joined this tour yet.' : 'Generate a QR code first to track tourists.'}</p>
+                      </div>
+                    )}
+                  </IonList>
                 )}
-              </IonList>
+              </>
             )}
           </IonCardContent>
         </IonCard>
@@ -785,7 +800,7 @@ const TouristList: React.FC = () => {
             disabled={!session || loading || isCompletedSession}
           >
             <IonIcon icon={sessionActive ? stopOutline : playOutline} />
-            <span>{isCompletedSession ? 'Completed' : sessionActive ? 'End' : 'Start'}</span>
+            <span>{isCompletedSession ? 'Completed' : sessionActive ? 'End Session' : 'Start Session'}</span>
           </button>
         </div>
       </IonContent>
@@ -808,7 +823,7 @@ const TouristList: React.FC = () => {
 
             <div className="detail-avatar-container">
               <IonAvatar className="detail-avatar">
-                <IonImg src="https://ionicframework.com/docs/img/demos/avatar.svg" />
+                <IonImg src={selectedTourist.photoUrl || selectedTourist.img || 'https://ionicframework.com/docs/img/demos/avatar.svg'} />
               </IonAvatar>
               <h2>{selectedTourist.name}</h2>
             </div>
@@ -829,45 +844,10 @@ const TouristList: React.FC = () => {
                 </div>
               </div>
               <div className="detail-info-item">
-                <IonIcon icon={walkOutline} />
+                <IonIcon icon={checkmarkCircleOutline} />
                 <div className="detail-info-text">
-                  <span className="detail-label">Age</span>
-                  <span className="detail-value">{selectedTourist.age !== undefined && selectedTourist.age !== '' ? selectedTourist.age : '—'}</span>
-                </div>
-              </div>
-              <div className="detail-info-item">
-                <IonIcon icon={walkOutline} />
-                <div className="detail-info-text">
-                  <span className="detail-label">Birth Date</span>
-                  <span className="detail-value">{selectedTourist.dateOfBirth || '—'}</span>
-                </div>
-              </div>
-              <div className="detail-info-item">
-                <IonIcon icon={walkOutline} />
-                <div className="detail-info-text">
-                  <span className="detail-label">Gender</span>
-                  <span className="detail-value">{selectedTourist.gender || '—'}</span>
-                </div>
-              </div>
-              <div className="detail-info-item">
-                <IonIcon icon={walkOutline} />
-                <div className="detail-info-text">
-                  <span className="detail-label">Nationality</span>
-                  <span className="detail-value">{selectedTourist.nationality || '—'}</span>
-                </div>
-              </div>
-              <div className="detail-info-item">
-                <IonIcon icon={walkOutline} />
-                <div className="detail-info-text">
-                  <span className="detail-label">Religion</span>
-                  <span className="detail-value">{selectedTourist.religion || '—'}</span>
-                </div>
-              </div>
-              <div className="detail-info-item">
-                <IonIcon icon={walkOutline} />
-                <div className="detail-info-text">
-                  <span className="detail-label">Address</span>
-                  <span className="detail-value">{selectedTourist.address || '—'}</span>
+                  <span className="detail-label">Status</span>
+                  <span className="detail-value">{selectedTourist.status || 'Joined'}</span>
                 </div>
               </div>
               <div className="detail-info-item">

@@ -11,7 +11,7 @@ import {
 } from '@ionic/react';
 import { useHistory, useParams } from 'react-router-dom';
 import { arrowBackOutline, listOutline, timeOutline } from 'ionicons/icons';
-import { doc, getDoc } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, query, where } from 'firebase/firestore';
 import { firestore } from '../../firebase';
 import './Feedbackqr.css';
 
@@ -25,6 +25,7 @@ const FeedbackQR: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [expiresIn, setExpiresIn] = useState(600);
   const [sessionData, setSessionData] = useState<any>(null);
+  const [allReviewed, setAllReviewed] = useState(false);
   const feedbackUrl = sessionId ? `${window.location.origin}/feedback/${sessionId}` : '';
 
   useEffect(() => {
@@ -36,7 +37,21 @@ const FeedbackQR: React.FC = () => {
     const loadData = async () => {
       try {
         const sessionSnap = await getDoc(doc(firestore, 'sessions', sessionId));
-        if (sessionSnap.exists()) setSessionData({ id: sessionSnap.id, ...sessionSnap.data() });
+        if (sessionSnap.exists()) {
+          const sessionDocData = sessionSnap.data() as any;
+          const nextSessionData = { id: sessionSnap.id, ...sessionDocData };
+          setSessionData(nextSessionData);
+
+          const tourists = Array.isArray(sessionDocData?.tourists) ? sessionDocData.tourists : [];
+          const feedbackSnap = await getDocs(query(collection(firestore, 'feedback'), where('sessionId', '==', sessionId)));
+          const reviewedIds = new Set(
+            feedbackSnap.docs.map((feedbackDoc) => String((feedbackDoc.data() as any)?.touristId || ''))
+          );
+          const pendingTourists = tourists.filter((tourist: any) => tourist?.uid && !reviewedIds.has(String(tourist.uid)));
+          setAllReviewed(tourists.length > 0 && pendingTourists.length === 0);
+        } else {
+          setAllReviewed(false);
+        }
         setQrUrl(buildQRUrl(feedbackUrl));
       } catch (err) {
         console.error('Failed to load session data:', err);
@@ -79,14 +94,28 @@ const FeedbackQR: React.FC = () => {
             <h2>Tour Completed!</h2>
             <p>Let your tourists share their experience. Ask them to scan this QR to leave a review.</p>
           </div>
-          <div className={`fqr-card ${isExpired ? 'fqr-expired' : ''}`}>
-            <div className="fqr-card-inner">
-              {isLoading ? <div className="fqr-loading"><IonSpinner name="crescent" /><p>Loading QR…</p></div>
-                : isExpired ? <div className="fqr-expired-overlay"><IonIcon icon={timeOutline} /><p>QR Expired</p><span>The feedback window has closed.</span></div>
-                : <img src={qrUrl} alt="Feedback QR code" className="fqr-image" />}
+
+          {allReviewed ? (
+            <div className="fqr-card fqr-card--complete">
+              <div className="fqr-card-inner">
+                <div className="fqr-expired-overlay">
+                  <IonIcon icon={timeOutline} />
+                  <p>Feedback Complete</p>
+                  <span>All tourists have already submitted their feedback.</span>
+                </div>
+              </div>
             </div>
-            {!isLoading && <div className={`fqr-timer ${expiresIn <= 60 ? 'fqr-timer--warning' : ''} ${isExpired ? 'fqr-timer--expired' : ''}`}><IonIcon icon={timeOutline} /><span>{isExpired ? 'Expired' : `Available for ${formatTime(expiresIn)}`}</span></div>}
-          </div>
+          ) : (
+            <div className={`fqr-card ${isExpired ? 'fqr-expired' : ''}`}>
+              <div className="fqr-card-inner">
+                {isLoading ? <div className="fqr-loading"><IonSpinner name="crescent" /><p>Loading QR…</p></div>
+                  : isExpired ? <div className="fqr-expired-overlay"><IonIcon icon={timeOutline} /><p>QR Expired</p><span>The feedback window has closed.</span></div>
+                  : <img src={qrUrl} alt="Feedback QR code" className="fqr-image" />}
+              </div>
+              {!isLoading && <div className={`fqr-timer ${expiresIn <= 60 ? 'fqr-timer--warning' : ''} ${isExpired ? 'fqr-timer--expired' : ''}`}><IonIcon icon={timeOutline} /><span>{isExpired ? 'Expired' : `Available for ${formatTime(expiresIn)}`}</span></div>}
+            </div>
+          )}
+
           {sessionId && (
             <div style={{ marginTop: 16 }}>
               <IonButton expand="block" fill="outline" onClick={() => history.push(`/reviews/${sessionId}`)}>

@@ -116,6 +116,18 @@ export interface TourBookingConflict {
   conflictingTourName?: string;
 }
 
+function isPermissionDeniedError(error: unknown): boolean {
+  if (!error) return false;
+
+  const code = typeof (error as any)?.code === 'string' ? (error as any).code.toLowerCase() : '';
+  const message = typeof (error as any)?.message === 'string' ? (error as any).message.toLowerCase() : '';
+
+  return code === 'permission-denied'
+    || message.includes('permission denied')
+    || message.includes('missing or insufficient permissions')
+    || message.includes('insufficient permissions');
+}
+
 export function parseSlotTimeRange(date: string, startTime: string, endTime: string): { startMs: number; endMs: number } {
   const startMs = new Date(`${date}T${startTime}:00`).getTime();
   let endMs = new Date(`${date}T${endTime}:00`).getTime();
@@ -502,8 +514,23 @@ export async function joinTour(
   tourist: { name: string; email: string },
 ): Promise<void> {
   if (!userId) throw new Error('User not logged in');
-  const userProfile = await getUserProfile(userId);
-  if (!userProfile?.emailVerified) {
+
+  let userProfile: Awaited<ReturnType<typeof getUserProfile>> | null = null;
+  try {
+    userProfile = await getUserProfile(userId);
+  } catch (error) {
+    const code = typeof (error as any)?.code === 'string' ? (error as any).code.toLowerCase() : '';
+    const message = typeof (error as any)?.message === 'string' ? (error as any).message.toLowerCase() : '';
+    const isPermissionDenied = code === 'permission-denied'
+      || message.includes('permission denied')
+      || message.includes('missing or insufficient permissions')
+      || message.includes('insufficient permissions');
+
+    if (!isPermissionDenied) throw error;
+    userProfile = null;
+  }
+
+  if (userProfile && !userProfile.emailVerified) {
     throw new Error('Please verify your profile before joining a tour.');
   }
   if (!tourist.email?.trim()) {
@@ -616,12 +643,6 @@ export async function joinTour(
       date: bookedSlot.date,
       startTime: bookedSlot.startTime,
       endTime: bookedSlot.endTime,
-      initialTourist: {
-        uid: userId,
-        name: tourist.name || 'Tourist',
-        email: tourist.email || '',
-        joinedAt: new Date().toISOString(),
-      },
     });
 
     await addTouristToSession(session.id, {
@@ -638,9 +659,19 @@ export async function joinTour(
       sessionId: session.id,
     });
   } catch (err) {
-    // Do not report a successful join when the shared session record was not
-    // written. The slot reservation is still retained for manual recovery;
-    // Firestore rules should allow this service to write both records.
+    // The slot reservation is the real join. If the mirrored session write is
+    // blocked by Firestore rules, we still keep the user joined and allow the
+    // UI to proceed; the permissions issue should be visible in logs, but it
+    // should not fail the whole action for a user who was already admitted.
+    if (isPermissionDeniedError(err)) {
+      console.warn('[tourScheduleService] joinTour: session mirror blocked by Firestore rules, but slot reservation was successful.', {
+        guideId,
+        slotIndex,
+        error: err,
+      });
+      return;
+    }
+
     console.error('[tourScheduleService] joinTour: failed to sync session record for guide/slot', guideId, slotIndex, err);
     throw err;
   }

@@ -185,7 +185,7 @@ const Notifications: React.FC = () => {
                   {unreadCount > 0 && <button className="notif-mark-all" onClick={handleMarkAllRead}>
                     <IonIcon icon={checkmarkDone} style={{ marginRight: 4, verticalAlign: 'middle' }} /> Mark all read
                   </button>}
-                  <button className="notif-mark-all" onClick={handleClearAll} aria-label="Clear all notifications">
+                  <button className="notif-mark-all" onClick={handleClearAll} aria-label="Clear all notifications" slot="end">
                     <IonIcon icon={trashOutline} style={{ marginRight: 4, verticalAlign: 'middle' }} /> Clear all
                   </button>
                 </div>

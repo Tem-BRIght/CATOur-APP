@@ -226,7 +226,7 @@ export function useSpeechRecognition(
         }
         const startPromise = NativeSpeechRecognition.start({
           language: lang,
-          partialResults: false,
+          partialResults: true,
           popup: false,
         });
         setIsListening(true);
@@ -239,12 +239,12 @@ export function useSpeechRecognition(
           updateTranscript(result.matches[0].trim());
           onFinalResultRef.current(result.matches[0].trim());
         }
-        // Some Android WebView implementations may not reliably emit a
-        // `listeningState: stopped` event after the final result. Ensure the
-        // hook resets UI state so the UI can start another session.
-        setIsListening(false);
-        updateTranscript('');
-        onEndRef.current?.();
+        // Keep the native session alive until the OS explicitly stops it or the
+        // user presses stop. Some Capacitor speech-recognition implementations
+        // resolve `start()` with a final transcript before the `listeningState`
+        // event arrives, so clearing `isListening` here prematurely kills the
+        // active capture instead of letting the user continue speaking.
+        setIsListening(true);
       } catch (err: any) {
         const message = err?.message ?? 'Could not start voice recognition. Please try again.';
         const busy = /busy|already|active/i.test(message);

@@ -1,6 +1,6 @@
 import {
   collection, doc, addDoc, updateDoc, deleteDoc, getDocs, writeBatch,
-  query, orderBy, limit, onSnapshot, serverTimestamp, Timestamp, Unsubscribe,
+  query, orderBy, limit, where, onSnapshot, serverTimestamp, Timestamp, Unsubscribe,
 } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { firestore, functions } from '../firebase';
@@ -49,8 +49,14 @@ export function getNotificationTarget(
   const id = notification.sessionId;
   const sessionPath = id ? `/tour-session/${encodeURIComponent(id)}` : '/tour';
   switch (notification.type) {
-    case 'join_confirmed': case 'join_blocked': case 'cancel_confirmed': case 'session_reminder':
+    case 'join_confirmed':
       return { path: '/tour', params: id ? { sessionId: id } : undefined };
+    case 'join_blocked':
+      return { path: '/tour', params: id ? { sessionId: id, highlightConflict: 'true' } : undefined };
+    case 'cancel_confirmed':
+      return { path: '/tour', params: id ? { sessionId: id, cancelled: 'true' } : undefined };
+    case 'session_reminder':
+      return { path: sessionPath, params: id ? { sessionId: id } : undefined };
     case 'checked_in': return { path: sessionPath, params: id ? { autoOpenMap: 'true' } : undefined };
     case 'session_started': case 'destination_visited': return { path: sessionPath };
     case 'session_ended': case 'feedback_reminder':
@@ -144,6 +150,21 @@ export async function notifyNewDestination(params: { recipientUids: string[]; de
 
 export async function createNotification(params: { userId: string; type: NotifType; title: string; message: string; link?: string; sessionId?: string; registrationId?: string; messageId?: string; guideId?: string }): Promise<void> {
   try {
+    if (params.sessionId && params.type) {
+      const existingSnapshot = await getDocs(
+        query(
+          itemsCol(params.userId),
+          where('sessionId', '==', params.sessionId),
+          where('type', '==', params.type),
+          limit(1),
+        )
+      );
+
+      if (!existingSnapshot.empty) {
+        return;
+      }
+    }
+
     await addDoc(itemsCol(params.userId), { type: params.type, title: params.title, message: params.message, link: params.link || '', unread: true, createdAt: serverTimestamp(),
       ...(params.sessionId ? { sessionId: params.sessionId } : {}), ...(params.registrationId ? { registrationId: params.registrationId } : {}),
       ...(params.messageId ? { messageId: params.messageId } : {}), ...(params.guideId ? { guideId: params.guideId } : {}) });

@@ -46,12 +46,14 @@ const resolveHomeRoute = async (uid: string): Promise<RouteResult> => {
     let role: string | undefined;
     let mustChangePassword = false;
     let status = 'active';
+    let isFullyRegistered = true;
 
     if (userSnap.exists()) {
       const data = userSnap.data();
       role = data?.role;
       mustChangePassword = data?.mustChangePassword === true;
       status = data?.status || 'active';
+      isFullyRegistered = data?.isFullyRegistered !== false;
     }
 
     if (!role) {
@@ -60,6 +62,7 @@ const resolveHomeRoute = async (uid: string): Promise<RouteResult> => {
         role = 'tourguide';
         status = guideSnap.data()?.status || 'active';
         mustChangePassword = guideSnap.data()?.mustChangePassword === true;
+        isFullyRegistered = guideSnap.data()?.isFullyRegistered !== false;
       }
     }
 
@@ -79,7 +82,10 @@ const resolveHomeRoute = async (uid: string): Promise<RouteResult> => {
       return { ok: true, path: '/tourguide/home' };
     }
 
-    // 4. Default to tourist home
+    if (!userSnap.exists() || !isFullyRegistered) {
+      return { ok: true, path: '/googleUser' };
+    }
+
     return { ok: true, path: '/home' };
   } catch (error) {
     console.warn('[Login] Unable to resolve role for post-login routing', error);
@@ -98,6 +104,7 @@ const Login: React.FC = () => {
   const { currentUser, isAuthenticated, authLoading } = useAuth();
   const { updateSignupData } = useSignup();
   const navigationInProgressRef = useRef(false);
+  const googleSignInInProgressRef = useRef(false);
 
   const [email,        setEmail]        = useState('');
   const [password,     setPassword]     = useState('');
@@ -123,7 +130,7 @@ const Login: React.FC = () => {
   // Must check role — tourguides go to /tourguide/home, not /home
   useEffect(() => {
     if (authLoading || !isAuthenticated || !currentUser || checkingGoogleRedirect
-      || navigationInProgressRef.current) return;
+      || navigationInProgressRef.current || googleSignInInProgressRef.current) return;
     handlePostAuth(currentUser.uid);
   }, [authLoading, currentUser, isAuthenticated, history, checkingGoogleRedirect]);
 
@@ -153,6 +160,10 @@ const Login: React.FC = () => {
   const completeGoogleLogin = async (user: any) => {
     if (!user?.uid) {
       throw new Error('Unable to complete Google sign-in. Please try again.');
+    }
+
+    if (navigationInProgressRef.current) {
+      return;
     }
 
     const snap = await getDoc(doc(firestore, 'users', user.uid));
@@ -270,6 +281,7 @@ const Login: React.FC = () => {
 
   // ── Google Login ────────────────────────────────────────────────────────────
   const handleGoogleLogin = async () => {
+    googleSignInInProgressRef.current = true;
     setShowLoading(true);
     try {
       const isNative = Capacitor.isNativePlatform?.() ?? Capacitor.getPlatform() !== 'web';
